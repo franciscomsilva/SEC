@@ -1,68 +1,76 @@
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import java.net.*;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
-import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Arrays;
 import java.util.Base64;
 
 
 class Client{
 
-    private static boolean verifySignature(String message, String digitalSignature, PublicKey publicKey) throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException {
-        byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        byte[] messageHash = md.digest(messageBytes);
-
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.DECRYPT_MODE, publicKey);
-        byte[] receivedHash = cipher.doFinal(Base64.getDecoder().decode(digitalSignature));
-
-
-        return Arrays.equals(messageHash,receivedHash);
-    }
 
     public static void main(String args[])throws Exception{
+        /*STARTS INPUT AND OUPUT SOCKET*/
         Socket s=new Socket("localhost",3333);
+        System.out.println("Connection to Server Established!");
         DataInputStream din=new DataInputStream(s.getInputStream());
         DataOutputStream dout=new DataOutputStream(s.getOutputStream());
         BufferedReader br=new BufferedReader(new InputStreamReader(System.in));
 
-        byte[] keyBytes = Files.readAllBytes(Paths.get("public"));
-
-        X509EncodedKeySpec spec =
-                new X509EncodedKeySpec(keyBytes);
+        /*READS PRIVATE AND PUBLIC KEY KEY TO SIGN AND VERIFY MESSAGE*/
+        byte[] privKeyBytes = Files.readAllBytes(Paths.get("priv"));
+        PKCS8EncodedKeySpec specPriv =
+                new PKCS8EncodedKeySpec(privKeyBytes);
         KeyFactory kf = KeyFactory.getInstance("RSA");
-        PublicKey publicKey = kf.generatePublic(spec);
-        String digitalSignature = null;
-        String message = null;
+        PrivateKey privateKey = kf.generatePrivate(specPriv);
 
-        String str="",str2="";
-        while(!str.equals("stop")){
-            str=br.readLine();
-            dout.writeUTF(str);
+        byte[] publicKeyBytes = Files.readAllBytes(Paths.get("public"));
+        X509EncodedKeySpec specPublic =
+                new X509EncodedKeySpec(publicKeyBytes);
+        PublicKey publicKey = kf.generatePublic(specPublic);
+
+
+        String input="",received="", message="", digitalSignatureRecv="";
+
+        /*READS INPUT UNTIL STRING='stop'*/
+        while(!input.equals("stop")){
+            /*READS THE USER INPUT*/
+            input=br.readLine();
+
+            /*SIGNS THE INPUT*/
+            byte[] digitalSignatureSent = Utils.signMessage(privateKey,input);
+
+            /*JOINS THE STRING AND THE SIGNATURE*/
+            StringBuilder sb = new StringBuilder();
+            sb.append("Message:" + input);
+            sb.append(" Digital Signature:");
+            sb.append(new String(Base64.getEncoder().encode(digitalSignatureSent)));
+
+            /*SENDS THE MESSAGE AND THE SIGNATURE*/
+            dout.writeUTF(sb.toString());
             dout.flush();
-            str2=din.readUTF();
-            message = str2.split("Message:")[1].split(" Digital")[0];
+
+            System.out.println("Received from server: ");
+
+            /*RECEIVES AND PROCESSES THE RECEIVED INPUT*/
+            received=din.readUTF();
+            message = received.split("Message:")[1].split(" Digital")[0];
             System.out.println("Message:" + message);
-            digitalSignature = str2.split("Digital Signature:")[1];
-            System.out.println("Digital Signature:" + digitalSignature);
+
+            digitalSignatureRecv = received.split("Digital Signature:")[1];
+            System.out.println("Digital Signature:" + digitalSignatureRecv);
+
 
             //VERIFIES THE SIGNATURE
-            if(verifySignature(message,digitalSignature,publicKey)){
-                System.out.println("Signature Verified!");
+            if(Utils.verifySignature(message,digitalSignatureRecv,publicKey)){
+                System.out.println("Server Signature Verified!");
             }else{
-                System.out.println("Signature Not Verified!");
+                System.out.println("Server Signature Not Verified!");
             }
+
+            System.out.println("----------------------------------------------------------------------------------------------------------------------------");
         }
 
         dout.close();

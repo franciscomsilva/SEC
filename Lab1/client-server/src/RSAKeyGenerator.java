@@ -40,11 +40,11 @@ public class RSAKeyGenerator {
         System.out.println("Private Key:");
         PrivateKey privKey = keys.getPrivate();
         byte[] privKeyEncoded = privKey.getEncoded();
-        System.out.println(DataUtils.bytesToHex(privKeyEncoded));
+        System.out.println(Utils.bytesToHex(privKeyEncoded));
         System.out.println("Public Key:");
         PublicKey pubKey = keys.getPublic();
         byte[] pubKeyEncoded = pubKey.getEncoded();
-        System.out.println(DataUtils.bytesToHex(pubKeyEncoded));
+        System.out.println(Utils.bytesToHex(pubKeyEncoded));
 
         System.out.println("Writing Private key to '" + privateKeyPath + "' ..." );
         FileOutputStream privFos = new FileOutputStream(privateKeyPath);
