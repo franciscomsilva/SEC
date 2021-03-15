@@ -1,3 +1,6 @@
+package Utils;
+
+
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -6,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Arrays;
 import java.util.Base64;
+
 
 public final class Utils {
     private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();

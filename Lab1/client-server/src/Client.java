@@ -6,6 +6,8 @@ import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import Utils.Utils;
+
 
 
 class Client{
@@ -20,13 +22,13 @@ class Client{
         BufferedReader br=new BufferedReader(new InputStreamReader(System.in));
 
         /*READS PRIVATE AND PUBLIC KEY KEY TO SIGN AND VERIFY MESSAGE*/
-        byte[] privKeyBytes = Files.readAllBytes(Paths.get("priv"));
+        byte[] privKeyBytes = Files.readAllBytes(Paths.get("Keys/priv_rsa"));
         PKCS8EncodedKeySpec specPriv =
                 new PKCS8EncodedKeySpec(privKeyBytes);
         KeyFactory kf = KeyFactory.getInstance("RSA");
         PrivateKey privateKey = kf.generatePrivate(specPriv);
 
-        byte[] publicKeyBytes = Files.readAllBytes(Paths.get("public"));
+        byte[] publicKeyBytes = Files.readAllBytes(Paths.get("Keys/public_rsa"));
         X509EncodedKeySpec specPublic =
                 new X509EncodedKeySpec(publicKeyBytes);
         PublicKey publicKey = kf.generatePublic(specPublic);
