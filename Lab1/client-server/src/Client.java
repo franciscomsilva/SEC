@@ -8,6 +8,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import Utils.Utils;
 
+import javax.crypto.spec.IvParameterSpec;
 
 
 class Client{
@@ -34,7 +35,7 @@ class Client{
         PublicKey publicKey = kf.generatePublic(specPublic);
 
 
-        String input="",received="", message="", digitalSignatureRecv="";
+        String input="",recv="", message="", digitalSignatureRecv="";
 
         /*READS INPUT UNTIL STRING='stop'*/
         while(!input.equals("stop")){
@@ -50,18 +51,31 @@ class Client{
             sb.append(" Digital Signature:");
             sb.append(new String(Base64.getEncoder().encode(digitalSignatureSent)));
 
-            /*SENDS THE MESSAGE AND THE SIGNATURE*/
-            dout.writeUTF(sb.toString());
-            dout.flush();
+            /*ENCRYPT THE WHOLE MESSAGE*/
+            String encrypted = Utils.encryptMessage("Keys/key_aes",sb.toString());
 
-            System.out.println("Received from server: ");
+            /*SENDS THE MESSAGE AND THE SIGNATURE*/
+            System.out.println("Sending encrypted message: " + encrypted);
+            dout.writeUTF(encrypted);
+            dout.flush();
+            System.out.println("----------------------------------------------------------------------------------------------------------------------------");
+
+
+
 
             /*RECEIVES AND PROCESSES THE RECEIVED INPUT*/
-            received=din.readUTF();
-            message = received.split("Message:")[1].split(" Digital")[0];
+            recv=din.readUTF();
+
+            /*DECRYPTS THE RECEIVED MESSAGE*/
+            System.out.println("Received Encrypted Message: " + recv);
+            String decrypted = Utils.decryptMessage("Keys/key_aes",recv);
+
+
+            /*PROCESSES THE RECEIVED MESSAGE*/
+            message = decrypted.split("Message:")[1].split(" Digital")[0];
             System.out.println("Message:" + message);
 
-            digitalSignatureRecv = received.split("Digital Signature:")[1];
+            digitalSignatureRecv = decrypted.split("Digital Signature:")[1];
             System.out.println("Digital Signature:" + digitalSignatureRecv);
 
 

@@ -1,4 +1,4 @@
-javac src/Utils/*.java
+javac src/Utils/Utils.java
 
 javac -cp src/Utils/* src/Server.java
 javac -cp src/Utils/* src/Client.java

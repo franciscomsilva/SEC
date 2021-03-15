@@ -49,12 +49,15 @@ class Server{
             /*READS THE RECEIVED INPUT*/
             recv=din.readUTF();
 
-            System.out.println("Received from client: ");
+            /*DECRYPTS THE RECEIVED MESSAGE*/
+            System.out.println("Received Encrypted Message: " + recv);
+            String decrypted = Utils.decryptMessage("Keys/key_aes",recv);
+
             /*PROCESSES THE RECEIVED MESSAGE*/
-            message = recv.split("Message:")[1].split(" Digital")[0];
+            message = decrypted.split("Message:")[1].split(" Digital")[0];
             System.out.println("Message:" + message);
 
-            digitalSignatureRecv = recv.split("Digital Signature:")[1];
+            digitalSignatureRecv = decrypted.split("Digital Signature:")[1];
             System.out.println("Digital Signature:" + digitalSignatureRecv);
 
             //VERIFIES THE SIGNATURE
@@ -63,6 +66,8 @@ class Server{
             }else{
                 System.out.println("Client Signature Not Verified!");
             }
+            System.out.println("----------------------------------------------------------------------------------------------------------------------------");
+
 
             //SIGN THE MESSAGE
             byte[] digitalSignatureSent = Utils.signMessage(privateKey,message);
@@ -72,8 +77,15 @@ class Server{
             sb.append("Message:" + message);
             sb.append(" Digital Signature:");
             sb.append(new String(Base64.getEncoder().encode(digitalSignatureSent)));
-            dout.writeUTF(sb.toString());
+
+            /*ENCRYPTS THE MESSAGE*/
+            String encrypted = Utils.encryptMessage("Keys/key_aes",sb.toString());
+
+            /*SENDS THE MESSAGE AND THE SIGNATURE*/
+            System.out.println("Sending encrypted message: " + encrypted);
+            dout.writeUTF(encrypted);
             dout.flush();
+
 
             System.out.println("----------------------------------------------------------------------------------------------------------------------------");
         }
