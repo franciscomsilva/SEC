@@ -150,7 +150,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     String msg = id +","+currentEpoch+","+xCoord+","+yCoord;
 
                     /*READS PRIVATE  KEY TO SIGN */
-                    byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user));
+                    byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
                     PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
                     KeyFactory kf = KeyFactory.getInstance("RSA");
                     PrivateKey privateKey = kf.generatePrivate(specPriv);
@@ -248,24 +248,33 @@ public class HDLT_user extends UserProtocolImplBase{
             //while (line != null) {
             Scanner scanner = new Scanner(System.in);
             while(true){
+                System.out.print("Epoch "+currentEpoch+"> ");
                 String line = scanner.nextLine();
                 String cmd = line.split(" ")[0];
                 switch (cmd) {
                     case "RequestProof":
+                    case "r":
+                        System.out.println("Requesting Location Proof to nearby users");
                         requestProof();
                         break;
                     case "SubmitLocation":
+                    case "s":
+                        System.out.println("Submitting Location");
                         SubmitLocation();
                         break;
                     case "ObtainLocation":
-                        ObtainLocation(Integer.parseInt(line.split(" ")[1]));
+                    case "o":
+                        int epoch = Integer.parseInt(line.split(" ")[1]);
+                        System.out.println("Obtaining Location of " + user + " at epoch " + epoch);
+                        ObtainLocation(epoch);
                         break;
                     case "Sleep":
                         Thread.sleep(Integer.parseInt(line.split(" ")[1]));
                         break;
                     case "Epoch":
+                    case "e":
                         currentEpoch = Integer.parseInt(line.split(" ")[1]);
-                        //System.out.println("test");
+                        System.out.println("Setting time to Epoch " + currentEpoch);
                         break;
                     default:
                         System.out.println("Some errors in reading of the script");

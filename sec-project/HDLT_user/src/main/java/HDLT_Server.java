@@ -65,13 +65,13 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         LocationResponse lr = null;
         Boolean flag = true;
         for (Map.Entry<String, String> entry : proofers.entrySet()) {
-            System.out.println("For" + entry.getKey() + " verifing " + entry.getValue());
+            System.out.println("For " + entry.getKey() + " verifing " + entry.getValue());
 
             KeyFactory kf = null;
             try {
                 kf = KeyFactory.getInstance("RSA");
 
-                byte[] publicKeyBytes = Files.readAllBytes(Paths.get("keys/"+entry.getKey()+".pub"));
+                byte[] publicKeyBytes = Files.readAllBytes(Paths.get("keys/"+entry.getKey()));
                 X509EncodedKeySpec specPublic = new X509EncodedKeySpec(publicKeyBytes);
                 PublicKey publicKey = kf.generatePublic(specPublic);
 
