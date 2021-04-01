@@ -1,6 +1,0 @@
-u1,localhost:2001
-u2,localhost:2002
-u3,localhost:2003
-u4,localhost:2004
-u5,localhost:2005
-server,localhost:2050

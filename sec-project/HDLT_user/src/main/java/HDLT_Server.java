@@ -153,7 +153,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             svc.start();
 
             System.out.println("Server started, listening on " + svcPort);
-
+            svc.awaitTermination();
+            svc.shutdown();
         } catch (Exception ex) {
             ex.printStackTrace();
         }

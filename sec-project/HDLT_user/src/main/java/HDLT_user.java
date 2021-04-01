@@ -212,7 +212,7 @@ public class HDLT_user extends UserProtocolImplBase{
         //Ler ficheiro com os endereços dos utilizadores
         readUsers();
         //Obter o próprio Utilizador bem como o port
-        user = args[1];
+        user = args[0];
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
         //Conexão com o servidor
@@ -243,10 +243,12 @@ public class HDLT_user extends UserProtocolImplBase{
         //Ler um Script com os requests de cada utilizador
         BufferedReader reader;
         try {
-            reader = new BufferedReader(new FileReader(user + ".txt"));
-            String line = reader.readLine();
-            while (line != null) {
-
+            //reader = new BufferedReader(new FileReader(user + ".txt"));
+            //String line = reader.readLine();
+            //while (line != null) {
+            Scanner scanner = new Scanner(System.in);
+            while(true){
+                String line = scanner.nextLine();
                 String cmd = line.split(" ")[0];
                 switch (cmd) {
                     case "RequestProof":
@@ -263,14 +265,16 @@ public class HDLT_user extends UserProtocolImplBase{
                         break;
                     case "Epoch":
                         currentEpoch = Integer.parseInt(line.split(" ")[1]);
+                        //System.out.println("test");
                         break;
                     default:
                         System.out.println("Some errors in reading of the script");
                 }
-                line = reader.readLine();
+                //line = reader.readLine();
             }
-            reader.close();
-        } catch (IOException | InterruptedException e) {
+            //reader.close();
+            //while (true);
+        } catch (Exception e) {
             e.printStackTrace();
         }
         svc.shutdown();
