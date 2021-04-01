@@ -1,3 +1,4 @@
+import com.google.protobuf.Descriptors;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import io.grpc.ManagedChannel;
@@ -7,16 +8,29 @@ import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
 import userprotocol.*;
 import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
-import userserver.UserServerGrpc;
+import userserver.*;
+
+
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
+
+import Utils.Utils;
+
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 
 import static java.lang.Integer.parseInt;
 
@@ -26,6 +40,10 @@ public class HDLT_user extends UserProtocolImplBase{
     static UserProtocolGrpc.UserProtocolBlockingStub blockingStub;
     static UserServerGrpc.UserServerBlockingStub bStub;
     static HashMap<String,String> UsersMap = new HashMap<>();
+
+    static HashMap<String,String> proofers = new HashMap<>();
+
+
     static String user;
     static int x;
     static int y;
@@ -105,13 +123,9 @@ public class HDLT_user extends UserProtocolImplBase{
         for (Map.Entry<String,double []> entry : RadiusUsers.entrySet()){
             connectToUser(UsersMap.get(entry.getKey()));
             try {
-
                 LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).build();
                 Proof proof = blockingStub.requestLocationProof(locationRequest);
-                String id = proof.getId();
-                String digSig = proof.getDigSig();
-
-
+                proofers.put(proof.getId(),proof.getDigSig());
 
             }catch (Exception e){
 
@@ -129,36 +143,68 @@ public class HDLT_user extends UserProtocolImplBase{
 
         try{
             HashMap<String,double []> users = readMap(currentEpoch);
-
             // Verificação se o requisitante está perto deste user
             if(users.containsKey(id)){
+                double [] coords = users.get(id);
+                if (xCoord == coords[1] && yCoord == coords[2]){
+                    String msg = id +","+currentEpoch+","+xCoord+","+yCoord;
 
+                    /*READS PRIVATE  KEY TO SIGN */
+                    byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user));
+                    PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
+                    KeyFactory kf = KeyFactory.getInstance("RSA");
+                    PrivateKey privateKey = kf.generatePrivate(specPriv);
 
-                responseObserver.onNext();
-                responseObserver.onCompleted();
+                    byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
 
+                    Proof pf = Proof.newBuilder().setId(user).setDigSig(digitalSignatureToSent.toString()).build();
+
+                    responseObserver.onNext(pf);
+                    responseObserver.onCompleted();
+                }else{
+                    //responseObserver.onError(new StatusException((Status.ABORTED.withDescription(e.getMessage()).withCause(e))));
+                }
             }else{
-                responseObserver.onError();
+                //responseObserver.onError();
             }
 
         } catch (CsvValidationException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
         }
 
 
-
     }
 
-    public static String[] SubmitLocation(){
+    public static void SubmitLocation(){
+        LocationReport lr = LocationReport.newBuilder().setId(user).setEp(currentEpoch).setXCoord(x).setYCoord(y).putAllReport(proofers).build();
+        LocationResponse bool = bStub.submitLocationReport(lr);
 
-        return null;
+        if(bool.getDone()){
+            proofers.clear();
+        }// e se não for true ???
     }
 
-    public static String[] ObtainLocation(){
+    public static void ObtainLocation(int epoch){
 
-        return null;
+        GetLocation gl = GetLocation.newBuilder().setId(user).setEp(epoch).build();
+        LocationStatus coords = bStub.obtainLocationReport(gl);
+
+        System.out.println("("+ coords.getXCoord()+","+coords.getYCoord()+") at epoch"+epoch);
+
     }
 
     public static void main(String[] args){
@@ -178,6 +224,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 .build();
         bStub = UserServerGrpc.newBlockingStub(channel);
 
+        //Instancia de Servidor para os Clients
         Server svc = null;
         try {
             svc = ServerBuilder
@@ -193,12 +240,10 @@ public class HDLT_user extends UserProtocolImplBase{
             ex.printStackTrace();
         }
 
-
-        //Ler um Script com os requests
+        //Ler um Script com os requests de cada utilizador
         BufferedReader reader;
         try {
-            reader = new BufferedReader(new FileReader(
-                    user + ".txt"));
+            reader = new BufferedReader(new FileReader(user + ".txt"));
             String line = reader.readLine();
             while (line != null) {
 
@@ -208,8 +253,10 @@ public class HDLT_user extends UserProtocolImplBase{
                         requestProof();
                         break;
                     case "SubmitLocation":
+                        SubmitLocation();
                         break;
                     case "ObtainLocation":
+                        ObtainLocation(Integer.parseInt(line.split(" ")[1]));
                         break;
                     case "Sleep":
                         Thread.sleep(Integer.parseInt(line.split(" ")[1]));
@@ -226,8 +273,6 @@ public class HDLT_user extends UserProtocolImplBase{
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
-
         svc.shutdown();
     }
-
 }
