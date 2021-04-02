@@ -42,6 +42,13 @@
             <scope>system</scope>
             <systemPath>${basedir}/../lib/UserProtocolContract-1.0.jar</systemPath>
         </dependency>
+        <dependency>
+            <groupId>sec</groupId>
+            <artifactId>HAProtocolContract</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/../lib/HAContract-1.0.jar</systemPath>
+        </dependency>
     </dependencies>
 
     <build>

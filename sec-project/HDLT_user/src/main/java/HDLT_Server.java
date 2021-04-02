@@ -1,5 +1,8 @@
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
+import hacontract.HAProtocolGrpc;
+import hacontract.UserAtLocation;
+import hacontract.Users;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
@@ -33,7 +36,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
     static HashMap<String,String> UsersMap = new HashMap<>();
-    static int currentEpoch;
 
     static HashMap<Integer,HashMap<String,int[]>> reports = new HashMap<>();
 
@@ -137,6 +139,49 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         LocationStatus ls = LocationStatus.newBuilder().setXCoord(coords[0]).setYCoord(coords[1]).build();
         responseObserver.onNext(ls);
         responseObserver.onCompleted();
+    }
+
+
+    public class HA_Server extends HAProtocolGrpc.HAProtocolImplBase {//TODO extends a implementação do contrato com o HA
+
+
+        @Override
+        public void obtainLocationReport(hacontract.GetLocation request, StreamObserver<hacontract.LocationStatus> responseObserver) {
+            String requester = request.getId();
+            int epoch = request.getEp();
+            int[] coords = {0,0};
+            if(reports.containsKey(epoch)) {
+                HashMap<String, int[]> UsersAt = reports.get(epoch);
+                if (UsersAt.containsKey(requester)) {
+                    coords = UsersAt.get(requester);
+                }
+            }
+            hacontract.LocationStatus ls = hacontract.LocationStatus.newBuilder().setXCoord(coords[0]).setYCoord(coords[1]).build();
+            responseObserver.onNext(ls);
+            responseObserver.onCompleted();
+        }
+
+        @Override
+        public void obtainUsersAtLocation(UserAtLocation request, StreamObserver<Users> responseObserver) {
+            int epoch = request.getEpoch();
+            int xCoords = request.getXCoord();
+            int yCoords = request.getYCoord();
+            List<String> users = new ArrayList<>();
+            if(reports.containsKey(epoch)) {
+                HashMap<String, int[]> UsersAt = reports.get(epoch);
+
+                for(Map.Entry<String, int[]> entry : UsersAt.entrySet()){
+                    String a = entry.getKey();
+                    int[] coords = entry.getValue();
+                    if(coords[0] == xCoords && coords[1] == yCoords){
+                        users.add(a);
+                    }
+                }
+            }
+            Users u = Users.newBuilder().addAllIds(users).build();
+            responseObserver.onNext(u);
+            responseObserver.onCompleted();
+        }
     }
 
     public static void main(String[] args){

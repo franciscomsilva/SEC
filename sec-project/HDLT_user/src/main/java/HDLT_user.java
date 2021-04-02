@@ -157,7 +157,7 @@ public class HDLT_user extends UserProtocolImplBase{
 
                     byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
 
-                    Proof pf = Proof.newBuilder().setId(user).setDigSig(digitalSignatureToSent.toString()).build();
+                    Proof pf = Proof.newBuilder().setId(user).setDigSig(new String(Base64.getEncoder().encode(digitalSignatureToSent))).build();
 
                     responseObserver.onNext(pf);
                     responseObserver.onCompleted();
