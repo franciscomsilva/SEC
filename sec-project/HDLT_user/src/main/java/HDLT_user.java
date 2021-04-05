@@ -12,6 +12,7 @@ import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
 
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
@@ -26,29 +27,34 @@ import java.util.*;
 
 
 import Utils.Utils;
+import userserver.Key;
 
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 
 import static java.lang.Integer.parseInt;
 
 public class HDLT_user extends UserProtocolImplBase{
 
     // Variaveis Globais
-    static UserProtocolGrpc.UserProtocolBlockingStub blockingStub;
-    static UserServerGrpc.UserServerBlockingStub bStub;
-    static HashMap<String,String> UsersMap = new HashMap<>();
+    private static UserProtocolGrpc.UserProtocolBlockingStub blockingStub;
+    private static UserServerGrpc.UserServerBlockingStub bStub;
 
-    static HashMap<String,String> proofers = new HashMap<>();
+    private static HashMap<String,String> UsersMap = new HashMap<>();
 
+    private static HashMap<String,String> proofers = new HashMap<>();
 
-    static String user;
-    static int x;
-    static int y;
+    private static SecretKey symmetricKey;
 
-    static int currentEpoch;
+    private static String user;
+    private static int x;
+    private static int y;
+
+    private static int currentEpoch;
 
 
     public static void readUsers() {
@@ -218,32 +224,36 @@ public class HDLT_user extends UserProtocolImplBase{
 
         // Encriptação
 
-        String message = null;
-
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
         try {
-            message = Utils.encryptMessage("keys/server",json.toString());
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        LocationReport lr = LocationReport.newBuilder().setMessage(message).build();
+        LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).setUser(user).build();
         LocationResponse resp = bStub.submitLocationReport(lr);
 
 
         // Desencriptar
 
-        String response = null;
+        encryptedMessage = resp.getMessage();
+        byte[] iv =Base64.getDecoder().decode(resp.getIv());
+        String decryptedMessage = null;
         try {
-            response = Utils.encryptMessage("keys/"+user+".key",resp.getMessage());
+            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        JsonObject convertedResponse = new Gson().fromJson(response, JsonObject.class);
+        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
 
         Boolean bool = convertedResponse.get("Done").getAsBoolean();
 
@@ -279,15 +289,13 @@ public class HDLT_user extends UserProtocolImplBase{
 
     }
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws GeneralSecurityException, IOException {
 
         //Ler ficheiro com os endereços dos utilizadores
         readUsers();
         //Obter o próprio Utilizador bem como o port
         user = args[0];
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
-
-
 
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
@@ -298,6 +306,12 @@ public class HDLT_user extends UserProtocolImplBase{
                 .usePlaintext()
                 .build();
         bStub = UserServerGrpc.newBlockingStub(channel);
+        InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+        Key responseKey = bStub.init(initMessage);
+        String base64SymmetricKey = responseKey.getKey();
+
+        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
+        symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
 
         //Instancia de Servidor para os Clients
         Server svc = null;

@@ -17,25 +17,29 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import Utils.*;
+import userserver.Key;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 
 import static java.lang.Integer.parseInt;
 
 public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
-    static HashMap<String,String> UsersMap = new HashMap<>();
+    private static HashMap<String,String> UsersMap = new HashMap<>();
 
-    static HashMap<Integer,HashMap<String,int[]>> reports = new HashMap<>();
+    private static HashMap<Integer,HashMap<String,int[]>> reports = new HashMap<>();
+
+    private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<>();
 
     public static void readUsers() {
         try (CSVReader reader = new CSVReader(new FileReader("Users.txt"))) {
@@ -53,12 +57,50 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     }
 
     @Override
+    public void init(InitMessage request, StreamObserver<Key> responseObserver) {
+       String user = request.getUser();
+       SecretKey secretKey = null;
+        try {
+            secretKey = AESKeyGenerator.write();
+            userSymmetricKeys.put(user,secretKey);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        PublicKey pubKey = null;
+        try {
+             pubKey = Utils.readPub("keys/"+user);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            String encryptedKey = Utils.encryptSymmetricKey(pubKey,secretKey);
+            Key symmetricKeyResponse = Key.newBuilder().setKey(encryptedKey).build();
+            responseObserver.onNext(symmetricKeyResponse);
+            responseObserver.onCompleted();
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+    }
+
+    @Override
     public void submitLocationReport(LocationReport request, StreamObserver<LocationResponse> responseObserver) {
 
         //Decoding
         String message = null;
         try {
-            message = Utils.decryptMessage("keys/server.key",request.getMessage());
+            byte[] iv = Base64.getDecoder().decode(request.getIv());
+            String user = request.getUser();
+            String encryptedMessage = request.getMessage();
+            message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -150,14 +192,17 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
 
         String resp = null;
+        IvParameterSpec iv = null;
         try {
-            resp = Utils.encryptMessage("keys/"+requester,json.toString());
+            iv = Utils.generateIv();
+            resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        LocationResponse lr = LocationResponse.newBuilder().setMessage(resp).build();
+        LocationResponse lr = LocationResponse.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                .encodeToString(iv.getIV())).build();
         responseObserver.onNext(lr);
         responseObserver.onCompleted();
     }

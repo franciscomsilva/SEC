@@ -1,10 +1,7 @@
 package Utils;
 
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
+import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.File;
@@ -23,7 +20,6 @@ import java.util.Base64;
 public final class Utils {
     private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
     private static final String MODE = "OFB";
-    private static final String IV_FILE = "Keys/iv";
     private static IvParameterSpec iv;
 
     static {
@@ -72,75 +68,85 @@ public final class Utils {
         byte[] iv = new byte[16];
         IvParameterSpec ivSpec = null;
 
-        File iv_file = new File(IV_FILE);
-        if(!Files.exists(iv_file.toPath())){
-            /*WRITES NEW IV TO FILE*/
-            new SecureRandom().nextBytes(iv);
-            ivSpec = new IvParameterSpec(iv);
-            Files.write(iv_file.toPath(), ivSpec.getIV());
-
-            return ivSpec;
-        }
-        iv = Files.readAllBytes(iv_file.toPath());
+        new SecureRandom().nextBytes(iv);
         ivSpec = new IvParameterSpec(iv);
-        Files.write(iv_file.toPath(), ivSpec.getIV());
 
         return ivSpec;
     }
 
-    public static String encryptMessage(String keyFile, String message) throws GeneralSecurityException, IOException {
-        Key key = readPub(keyFile);
+    public static String encryptMessageSymmetric(Key key, String message,IvParameterSpec ivSpec) throws GeneralSecurityException, IOException {
+
+        Cipher cipher = Cipher.getInstance("AES/" + MODE + "/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
+        byte[] cipherText = cipher.doFinal(message.getBytes());
+
+        return Base64.getEncoder()
+                .encodeToString(cipherText);
+    }
+
+    public static String decryptMessageSymmetric(Key key, String message, byte[] iv) throws GeneralSecurityException, IOException {
+        IvParameterSpec ivSpec = null;
+        ivSpec = new IvParameterSpec(iv);
+
+        Cipher cipher = Cipher.getInstance("AES/" + MODE + "/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, key, ivSpec);
+
+        byte[] cipheredBytes = Base64.getDecoder().decode(message);
+
+        byte[] decipheredBytes = cipher.doFinal(cipheredBytes);
+
+        return new String(decipheredBytes);
+    }
+
+    public static SecretKey generateSymmetricKey(byte[] keyBytes){
+        return new SecretKeySpec(keyBytes, 0, keyBytes.length, "AES");
+    }
+
+    public static String encryptMessageAssymetric(Key key, String message) throws GeneralSecurityException, IOException {
         Cipher cipher = Cipher.getInstance("RSA");
         cipher.init(Cipher.ENCRYPT_MODE, key);
-        //byte[] cipherText = cipher.doFinal(message.getBytes());
-        int offSet = 0;
-        int inputLength = message.length();
-        byte[] resultBytes = {};
-        byte[] cache = {};
 
-        while (inputLength - offSet > 0) {
-            if (inputLength - offSet > 117) {
-                cache = cipher.doFinal(message.getBytes(), offSet, 117);
-                offSet += 117;
-            } else {
-                cache = cipher.doFinal(message.getBytes(), offSet, inputLength - offSet);
-                offSet = inputLength;
-            }
-            resultBytes = Arrays.copyOf(resultBytes, resultBytes.length + cache.length);
-            System.arraycopy(cache, 0, resultBytes, resultBytes.length - cache.length, cache.length);
-        }
-
+        byte[] resultBytes = cipher.doFinal(message.getBytes());
 
         return Base64.getEncoder()
                 .encodeToString(resultBytes);
     }
 
-    public static String decryptMessage(String keyFile, String message) throws GeneralSecurityException, IOException {
+
+    public static byte[] decryptMessageAssymetric(String keyFile, String message) throws GeneralSecurityException, IOException {
         PrivateKey key = readPriv(keyFile);
         Cipher cipher = Cipher.getInstance("RSA");
         cipher.init(Cipher.DECRYPT_MODE, key);
 
         byte[] cipheredBytes = Base64.getDecoder().decode(message);
 
-        int offSet = 0;
-        int inputLength = message.length();
-        byte[] resultBytes = {};
-        byte[] cache = {};
+        byte[] resultBytes = cipher.doFinal(cipheredBytes);
 
-        while (inputLength - offSet > 0) {
-            if (inputLength - offSet > 117) {
-                cache = cipher.doFinal(cipheredBytes, offSet, 117);
-                offSet += 117;
-            } else {
-                cache = cipher.doFinal(cipheredBytes, offSet, inputLength - offSet);
-                offSet = inputLength;
-            }
-            resultBytes = Arrays.copyOf(resultBytes, resultBytes.length + cache.length);
-            System.arraycopy(cache, 0, resultBytes, resultBytes.length - cache.length, cache.length);
-        }
-
-        return new String(resultBytes);
+        return resultBytes;
     }
+
+    public static String encryptSymmetricKey(Key key, SecretKey secretKey) throws GeneralSecurityException, IOException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, key);
+
+        byte[] resultBytes = cipher.doFinal(secretKey.getEncoded());
+
+        return Base64.getEncoder()
+                .encodeToString(resultBytes);
+    }
+
+    public static SecretKey decryptSymmetricKey(String keyFile, String message) throws GeneralSecurityException, IOException {
+        PrivateKey key = readPriv(keyFile);
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.DECRYPT_MODE, key);
+
+        byte[] cipheredBytes = Base64.getDecoder().decode(message);
+
+        byte[] resultBytes = cipher.doFinal(cipheredBytes);
+
+        return  generateSymmetricKey(resultBytes);
+    }
+
 
     public static PrivateKey readPriv(String keyPath) throws GeneralSecurityException, IOException {
         byte[] keyBytes = Files.readAllBytes(Paths.get(keyPath));

@@ -7,24 +7,34 @@ option java_package = "userserver";
 package userserver; // package do proto
 
 service UserServer {
+    rpc init (InitMessage) returns (Key);
     rpc submitLocationReport (LocationReport) returns (LocationResponse);
     rpc obtainLocationReport (GetLocation) returns (LocationStatus);
 }
 
-message LocationReport {
-    string message = 1;
+message InitMessage {
+    string user = 1;
+}
+message Key {
+    string key = 1;
 }
 
+message LocationReport {
+    string user = 1;
+    string message = 2;
+    string iv = 3;
+}
 message LocationResponse {
     string message = 1;
+    string iv = 2;
 }
 
 message GetLocation {
-    string message = 1;
+    string user = 1;
+    string message = 2;
+    string iv = 3;
 }
-
 message LocationStatus {
     string message = 1;
+    string iv = 2;
 }
-
-
