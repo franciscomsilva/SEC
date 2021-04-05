@@ -1,10 +1,9 @@
-import com.google.protobuf.Descriptors;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 import userprotocol.*;
 import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
@@ -16,7 +15,6 @@ import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -191,8 +189,22 @@ public class HDLT_user extends UserProtocolImplBase{
     }
 
     public static void SubmitLocation(){
+        Gson gson = new Gson();
+        String proofersString = gson.toJson(proofers);
+
+        JsonObject json = new JsonObject();
+        json.addProperty("userID", user);
+        json.addProperty("currentEpoch",currentEpoch);
+        json.addProperty("xCoord",x);
+        json.addProperty("yCoord",y);
+        json.addProperty("proofers",proofersString);
+
+        System.out.println(json.toString());
+
+
         LocationReport lr = LocationReport.newBuilder().setId(user).setEp(currentEpoch).setXCoord(x).setYCoord(y).putAllReport(proofers).build();
         LocationResponse bool = bStub.submitLocationReport(lr);
+
 
         if(bool.getDone()){
             proofers.clear();
@@ -218,10 +230,13 @@ public class HDLT_user extends UserProtocolImplBase{
         user = args[0];
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
+
+
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
         String svcIP = phrase.split(":")[0];
         int sPort = Integer.parseInt(phrase.split(":")[1]);
+
         ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
                 .usePlaintext()
                 .build();
