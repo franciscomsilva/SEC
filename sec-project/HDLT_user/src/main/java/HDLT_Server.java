@@ -209,9 +209,18 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
     @Override
     public void obtainLocationReport(GetLocation request, StreamObserver<LocationStatus> responseObserver) {
-        String message = request.getMessage();
-
         //Decoding
+        String message = null;
+        try {
+            byte[] iv = Base64.getDecoder().decode(request.getIv());
+            String user = request.getUser();
+            String encryptedMessage = request.getMessage();
+            message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         JsonObject convertedRequest= new Gson().fromJson(message, JsonObject.class);
 
@@ -229,9 +238,21 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         json.addProperty("XCoord",coords[0]);
         json.addProperty("YCoord",coords[1]);
 
-        //Encrupt
-        String resp = json.toString();
-        LocationStatus ls = LocationStatus.newBuilder().setMessage(resp).build();
+        //Encriptação
+
+
+        String resp = null;
+        IvParameterSpec iv = null;
+        try {
+            iv = Utils.generateIv();
+            resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        LocationStatus ls = LocationStatus.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                .encodeToString(iv.getIV())).build();
         responseObserver.onNext(ls);
         responseObserver.onCompleted();
     }

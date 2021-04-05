@@ -272,15 +272,32 @@ public class HDLT_user extends UserProtocolImplBase{
 
         // Encriptação
 
-        String message = json.toString();
-        GetLocation gl = GetLocation.newBuilder().setMessage(message).build();
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
+        try {
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).build();
         LocationStatus resp = bStub.obtainLocationReport(gl);
 
-        String response = resp.getMessage();
-
-        // desencriptar
-
-        JsonObject convertedResponse = new Gson().fromJson(response, JsonObject.class);
+        encryptedMessage = resp.getMessage();
+        byte[] iv =Base64.getDecoder().decode(resp.getIv());
+        String decryptedMessage = null;
+        try {
+            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
 
         int XCoord = convertedResponse.get("XCoord").getAsInt();
         int YCoord = convertedResponse.get("YCoord").getAsInt();
