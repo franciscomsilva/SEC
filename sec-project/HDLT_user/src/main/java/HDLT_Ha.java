@@ -51,7 +51,6 @@ public class HDLT_Ha {
 
         for(String u : users){
             System.out.print(u);
-
         }
         System.out.println("");
     }
@@ -61,24 +60,16 @@ public class HDLT_Ha {
     public static void main(String[] args){
         readUsers();
 
-
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
         String svcIP = phrase.split(":")[0];
-        int sPort = Integer.parseInt(phrase.split(":")[1] + 50);
+        int sPort = Integer.parseInt(phrase.split(":")[1] )+ 50;
         ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
                 .usePlaintext()
                 .build();
         bStub = HAProtocolGrpc.newBlockingStub(channel);
 
-
-
-        //Ler um Script com os requests de cada utilizador
-        BufferedReader reader;
         try {
-            //reader = new BufferedReader(new FileReader(user + ".txt"));
-            //String line = reader.readLine();
-            //while (line != null) {
             Scanner scanner = new Scanner(System.in);
             int epoch = 0;
             while(true){
@@ -97,9 +88,9 @@ public class HDLT_Ha {
 
                     case "ObtainUsersAtLocation":
                     case "r":
-                        epoch = Integer.parseInt(line.split(" ")[2]);
+                        epoch = Integer.parseInt(line.split(" ")[1]);
                         int xCoords = Integer.parseInt(line.split(" ")[2]);
-                        int yCoords = Integer.parseInt(line.split(" ")[2]);
+                        int yCoords = Integer.parseInt(line.split(" ")[3]);
                         System.out.println("Requesting Location Proof to nearby users");
                         ObtainUsersAtLocation(epoch,xCoords,yCoords);
                         break;
@@ -108,10 +99,7 @@ public class HDLT_Ha {
                     default:
                         System.out.println("Some errors in reading of the script");
                 }
-                //line = reader.readLine();
             }
-            //reader.close();
-            //while (true);
         } catch (Exception e) {
             e.printStackTrace();
         }

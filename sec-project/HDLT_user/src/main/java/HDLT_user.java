@@ -108,30 +108,31 @@ public class HDLT_user extends UserProtocolImplBase{
         return RadiusUsers;
     }
 
-    public static String[] requestProof(){
+    public static void requestProof(){
 
         HashMap<String,double []> RadiusUsers = new HashMap<>();
         try {
             RadiusUsers = readMap(currentEpoch);
-
         } catch (IOException e) {
             e.printStackTrace();
         } catch (CsvValidationException e) {
             e.printStackTrace();
         }
+        if(!RadiusUsers.isEmpty()){
+            for (Map.Entry<String,double []> entry : RadiusUsers.entrySet()){
+                connectToUser(UsersMap.get(entry.getKey()));
+                try {
+                    LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).build();
+                    Proof proof = blockingStub.requestLocationProof(locationRequest);
+                    proofers.put(proof.getId(),proof.getDigSig());
+                }catch (Exception e){
 
-        for (Map.Entry<String,double []> entry : RadiusUsers.entrySet()){
-            connectToUser(UsersMap.get(entry.getKey()));
-            try {
-                LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).build();
-                Proof proof = blockingStub.requestLocationProof(locationRequest);
-                proofers.put(proof.getId(),proof.getDigSig());
-
-            }catch (Exception e){
-
+                }
             }
         }
-        return null;
+        else{
+            System.out.println("Don't have proofers");
+        }
     }
 
     @Override
@@ -195,7 +196,9 @@ public class HDLT_user extends UserProtocolImplBase{
 
         if(bool.getDone()){
             proofers.clear();
-        }// e se não for true ???
+        }else{
+            System.out.println("Submittion failed!");
+        }
     }
 
     public static void ObtainLocation(int epoch){
