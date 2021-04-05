@@ -1,0 +1,31 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+option java_multiple_files = true;
+option java_package = "hacontract";
+
+package hacontract; // package do proto
+
+service HAProtocol {
+    rpc obtainLocationReport (GetLocation) returns (LocationStatus);
+    rpc obtainUsersAtLocation (UserAtLocation) returns (Users);
+}
+
+message GetLocation {
+    string id = 1;
+    int32 ep = 2;
+}
+message LocationStatus {
+    int32 xCoord = 1;
+    int32 yCoord = 2;
+}
+message UserAtLocation {
+    int32 xCoord = 1;
+    int32 yCoord = 2;
+    int32 epoch = 3;
+}
+message Users {
+    repeated string ids = 1;
+}
+
+

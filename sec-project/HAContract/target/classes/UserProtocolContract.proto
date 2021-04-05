@@ -1,0 +1,25 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+option java_multiple_files = true;
+option java_package = "userprotocol";
+
+package userprotocol; // package do proto
+
+service UserProtocol {
+    rpc requestLocationProof (LocationRequest) returns (Proof);
+}
+
+message LocationRequest {
+    int32 id = 1;
+    int32 xCoord = 2;
+    int32 yCoord = 3;
+}
+message Proof {
+    int32 id = 1;
+    string digSig = 2;
+}
+
+
+
+

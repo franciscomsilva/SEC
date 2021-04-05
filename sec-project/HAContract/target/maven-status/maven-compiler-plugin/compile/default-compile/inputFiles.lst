@@ -1,0 +1,16 @@
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/LocationStatusOrBuilder.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userprotocol/LocationRequest.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/LocationResponse.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/LocationReport.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userprotocol/UserProtocolContract.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/LocationStatus.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/GetLocation.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userprotocol/Proof.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/grpc-java/userprotocol/UserProtocolGrpc.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userprotocol/ProofOrBuilder.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/grpc-java/userserver/UserServerGrpc.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userprotocol/LocationRequestOrBuilder.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/LocationResponseOrBuilder.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/UserServerContract.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/GetLocationOrBuilder.java
+/home/drogon/Documents/sec-project/UserProtocolContract/target/generated-sources/protobuf/java/userserver/LocationReportOrBuilder.java
