@@ -1,23 +1,25 @@
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import hacontract.HAProtocolGrpc;
 import hacontract.UserAtLocation;
 import hacontract.Users;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
-import userprotocol.*;
 import userserver.*;
 
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
-import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,10 +27,6 @@ import java.util.List;
 import java.util.Map;
 
 import Utils.*;
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 
 import static java.lang.Integer.parseInt;
 
@@ -56,17 +54,45 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
     @Override
     public void submitLocationReport(LocationReport request, StreamObserver<LocationResponse> responseObserver) {
-        String requester = request.getId();
-        int epoch = request.getEp();
-        int xCoords = request.getXCoord();
-        int yCoords = request.getYCoord();
 
-        Map<String, String> proofers = request.getReportMap();
+        //Decoding
+        String message = null;
+        try {
+            message = Utils.decryptMessage("keys/server.key",request.getMessage());
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
+
+
+        JsonObject convertedRequest= new Gson().fromJson(message, JsonObject.class);
+
+
+        String requester = convertedRequest.get("userID").getAsString();
+        int epoch = convertedRequest.get("currentEpoch").getAsInt();
+        int xCoords = convertedRequest.get("xCoord").getAsInt();
+        int yCoords = convertedRequest.get("yCoord").getAsInt();
+        JsonArray ab = convertedRequest.get("proofers").getAsJsonArray();
+
+        Map<String, String> proofers = new HashMap<>();
+
+        for (JsonElement o : ab){
+            JsonObject obj = o.getAsJsonObject();
+            System.out.println(o.toString());
+            proofers.put(obj.get("userID").getAsString(),obj.get("digSIG").getAsString());
+        }
+
+
+
+        for (Map.Entry<String, String> entry : proofers.entrySet()) {
+            System.out.println(entry.getKey()+":"+entry.getValue());
+        }
         String verify = requester+","+epoch+","+xCoords+","+yCoords;
-        LocationResponse lr = null;
-        Boolean flag = true;
 
+        Boolean flag = true;
+        Boolean done = false;
 
         if(!proofers.isEmpty()) {
             for (Map.Entry<String, String> entry : proofers.entrySet()) {
@@ -107,23 +133,46 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                         reports.put(epoch, a);
                     }
 
-                    lr = LocationResponse.newBuilder().setDone(true).build();
+                    done = true;
                 } else {
-                    lr = LocationResponse.newBuilder().setDone(false).build();
+                    done = false;
                 }
             }
         }
         else{
-            lr = LocationResponse.newBuilder().setDone(false).build();
+            done = false;
         }
+
+        JsonObject json = new JsonObject();
+        json.addProperty("Done",done);
+
+        //Encriptação
+
+
+        String resp = null;
+        try {
+            resp = Utils.encryptMessage("keys/"+requester,json.toString());
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        LocationResponse lr = LocationResponse.newBuilder().setMessage(resp).build();
         responseObserver.onNext(lr);
         responseObserver.onCompleted();
     }
 
     @Override
     public void obtainLocationReport(GetLocation request, StreamObserver<LocationStatus> responseObserver) {
-        String requester = request.getId();
-        int epoch = request.getEp();
+        String message = request.getMessage();
+
+        //Decoding
+
+        JsonObject convertedRequest= new Gson().fromJson(message, JsonObject.class);
+
+
+        String requester = convertedRequest.get("userID").getAsString();
+        int epoch = convertedRequest.get("Epoch").getAsInt();
         int[] coords = {0,0};
         if(reports.containsKey(epoch)) {
             HashMap<String, int[]> UsersAt = reports.get(epoch);
@@ -131,7 +180,13 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 coords = UsersAt.get(requester);
             }
         }
-        LocationStatus ls = LocationStatus.newBuilder().setXCoord(coords[0]).setYCoord(coords[1]).build();
+        JsonObject json = new JsonObject();
+        json.addProperty("XCoord",coords[0]);
+        json.addProperty("YCoord",coords[1]);
+
+        //Encrupt
+        String resp = json.toString();
+        LocationStatus ls = LocationStatus.newBuilder().setMessage(resp).build();
         responseObserver.onNext(ls);
         responseObserver.onCompleted();
     }

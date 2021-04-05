@@ -12,22 +12,19 @@ service UserServer {
 }
 
 message LocationReport {
-    string id = 1;
-    int32 ep = 2;
-    int32 xCoord = 3;
-    int32 yCoord = 4;
-    map<string, string> report = 5;
+    string message = 1;
 }
+
 message LocationResponse {
-    bool done = 1;
+    string message = 1;
 }
+
 message GetLocation {
-    string id = 1;
-    int32 ep = 2;
+    string message = 1;
 }
+
 message LocationStatus {
-    int32 xCoord = 1;
-    int32 yCoord = 2;
+    string message = 1;
 }
 
 

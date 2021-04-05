@@ -1,10 +1,12 @@
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
+
 import userprotocol.*;
 import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
@@ -189,24 +191,63 @@ public class HDLT_user extends UserProtocolImplBase{
     }
 
     public static void SubmitLocation(){
-        Gson gson = new Gson();
-        String proofersString = gson.toJson(proofers);
+
+        JsonArray proofersArray = new JsonArray();
+
+        System.out.println(proofersArray);
+        if(!proofers.isEmpty()){
+            for (Map.Entry<String, String> entry : proofers.entrySet()) {
+               JsonObject o = new JsonObject();
+               o.addProperty("userID",entry.getKey());
+               o.addProperty("digSIG",entry.getValue());
+
+               proofersArray.add(o);
+            }
+        }
+
 
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
         json.addProperty("currentEpoch",currentEpoch);
         json.addProperty("xCoord",x);
         json.addProperty("yCoord",y);
-        json.addProperty("proofers",proofersString);
+        json.add("proofers",proofersArray);
+
 
         System.out.println(json.toString());
 
+        // Encriptação
 
-        LocationReport lr = LocationReport.newBuilder().setId(user).setEp(currentEpoch).setXCoord(x).setYCoord(y).putAllReport(proofers).build();
-        LocationResponse bool = bStub.submitLocationReport(lr);
+        String message = null;
+
+        try {
+            message = Utils.encryptMessage("keys/server",json.toString());
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        LocationReport lr = LocationReport.newBuilder().setMessage(message).build();
+        LocationResponse resp = bStub.submitLocationReport(lr);
 
 
-        if(bool.getDone()){
+        // Desencriptar
+
+        String response = null;
+        try {
+            response = Utils.encryptMessage("keys/"+user+".key",resp.getMessage());
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        JsonObject convertedResponse = new Gson().fromJson(response, JsonObject.class);
+
+        Boolean bool = convertedResponse.get("Done").getAsBoolean();
+
+        if(bool){
             proofers.clear();
         }else{
             System.out.println("Submittion failed!");
@@ -215,10 +256,26 @@ public class HDLT_user extends UserProtocolImplBase{
 
     public static void ObtainLocation(int epoch){
 
-        GetLocation gl = GetLocation.newBuilder().setId(user).setEp(epoch).build();
-        LocationStatus coords = bStub.obtainLocationReport(gl);
+        JsonObject json = new JsonObject();
+        json.addProperty("userID", user);
+        json.addProperty("Epoch",epoch);
 
-        System.out.println("("+ coords.getXCoord()+","+coords.getYCoord()+") at epoch"+epoch);
+        // Encriptação
+
+        String message = json.toString();
+        GetLocation gl = GetLocation.newBuilder().setMessage(message).build();
+        LocationStatus resp = bStub.obtainLocationReport(gl);
+
+        String response = resp.getMessage();
+
+        // desencriptar
+
+        JsonObject convertedResponse = new Gson().fromJson(response, JsonObject.class);
+
+        int XCoord = convertedResponse.get("XCoord").getAsInt();
+        int YCoord = convertedResponse.get("YCoord").getAsInt();
+
+        System.out.println("User "+user+" are in ("+ XCoord+","+YCoord+") at epoch "+epoch);
 
     }
 

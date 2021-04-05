@@ -12,7 +12,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 
@@ -86,34 +89,73 @@ public final class Utils {
     }
 
     public static String encryptMessage(String keyFile, String message) throws GeneralSecurityException, IOException {
-        Key key = read(keyFile);
-        Cipher cipher = Cipher.getInstance("AES/" + MODE + "/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE, key, generateIv());
-        byte[] cipherText = cipher.doFinal(message.getBytes());
+        Key key = readPub(keyFile);
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, key);
+        //byte[] cipherText = cipher.doFinal(message.getBytes());
+        int offSet = 0;
+        int inputLength = message.length();
+        byte[] resultBytes = {};
+        byte[] cache = {};
+
+        while (inputLength - offSet > 0) {
+            if (inputLength - offSet > 117) {
+                cache = cipher.doFinal(message.getBytes(), offSet, 117);
+                offSet += 117;
+            } else {
+                cache = cipher.doFinal(message.getBytes(), offSet, inputLength - offSet);
+                offSet = inputLength;
+            }
+            resultBytes = Arrays.copyOf(resultBytes, resultBytes.length + cache.length);
+            System.arraycopy(cache, 0, resultBytes, resultBytes.length - cache.length, cache.length);
+        }
+
 
         return Base64.getEncoder()
-                .encodeToString(cipherText);
+                .encodeToString(resultBytes);
     }
 
     public static String decryptMessage(String keyFile, String message) throws GeneralSecurityException, IOException {
-        Key key = read(keyFile);
-        Cipher cipher = Cipher.getInstance("AES/" + MODE + "/NoPadding");
-        cipher.init(Cipher.DECRYPT_MODE, key, generateIv());
+        PrivateKey key = readPriv(keyFile);
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.DECRYPT_MODE, key);
 
         byte[] cipheredBytes = Base64.getDecoder().decode(message);
 
-        byte[] decipheredBytes = cipher.doFinal(cipheredBytes);
+        int offSet = 0;
+        int inputLength = message.length();
+        byte[] resultBytes = {};
+        byte[] cache = {};
 
-        return new String(decipheredBytes);
+        while (inputLength - offSet > 0) {
+            if (inputLength - offSet > 117) {
+                cache = cipher.doFinal(cipheredBytes, offSet, 117);
+                offSet += 117;
+            } else {
+                cache = cipher.doFinal(cipheredBytes, offSet, inputLength - offSet);
+                offSet = inputLength;
+            }
+            resultBytes = Arrays.copyOf(resultBytes, resultBytes.length + cache.length);
+            System.arraycopy(cache, 0, resultBytes, resultBytes.length - cache.length, cache.length);
+        }
+
+        return new String(resultBytes);
     }
 
-    public static Key read(String keyPath) throws GeneralSecurityException, IOException {
-        FileInputStream fis = new FileInputStream(keyPath);
-        byte[] encoded = new byte[fis.available()];
-        fis.read(encoded);
-        fis.close();
+    public static PrivateKey readPriv(String keyPath) throws GeneralSecurityException, IOException {
+        byte[] keyBytes = Files.readAllBytes(Paths.get(keyPath));
 
-        return new SecretKeySpec(encoded, 0, 16, "AES");
+        PKCS8EncodedKeySpec spec =
+                new PKCS8EncodedKeySpec(keyBytes);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        return kf.generatePrivate(spec);
     }
+    public static PublicKey readPub(String keyPath) throws GeneralSecurityException, IOException {
+        byte[] keyBytes = Files.readAllBytes(Paths.get(keyPath));
 
+        X509EncodedKeySpec spec =
+                new X509EncodedKeySpec(keyBytes);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        return kf.generatePublic(spec);
+    }
 }
