@@ -1,0 +1,3 @@
+- Enviar uma mensagem com userID diferente do requester
+- Enviar uma mensagem com userID forjado (diferente da simmetric key)
+- Enviar um location submit replay

@@ -10,6 +10,8 @@ import hacontract.UserAtLocation;
 import hacontract.Users;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.Status;
+import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import userserver.*;
 
@@ -87,8 +89,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-
     }
 
     @Override
@@ -96,24 +96,35 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
         //Decoding
         String message = null;
+        String user = null;
         try {
             byte[] iv = Base64.getDecoder().decode(request.getIv());
-            String user = request.getUser();
+            user = request.getUser();
             String encryptedMessage = request.getMessage();
             message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.print("ERROR: Invalid key");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+            return;
         }
 
-
-
         JsonObject convertedRequest= new Gson().fromJson(message, JsonObject.class);
-
-
         String requester = convertedRequest.get("userID").getAsString();
+
+        if(!requester.equals(user)){
+            System.err.print("ERROR: Invalid user");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid user"))));
+            return;
+        }
+
         int epoch = convertedRequest.get("currentEpoch").getAsInt();
+
+        if(reports.containsKey(epoch) && reports.get(epoch).containsKey(user)){
+            System.err.print("ERROR: Invalid request");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid request"))));
+            return;
+        }
+
         int xCoords = convertedRequest.get("xCoord").getAsInt();
         int yCoords = convertedRequest.get("yCoord").getAsInt();
         JsonArray ab = convertedRequest.get("proofers").getAsJsonArray();
@@ -154,6 +165,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     } else {
                         System.out.println("Server Signature Not Verified!");
                         flag = false;
+                        //TODO CONTAR O NUMERO DE PROOFERS CORRETO E SO DESCARTAR CASO SEJA MENOR
                         break;
                     }
                 } catch (Exception e) {
@@ -259,8 +271,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
 
     public static class HA_Server extends HAProtocolGrpc.HAProtocolImplBase {
-
-
         @Override
         public void obtainLocationReport(hacontract.GetLocation request, StreamObserver<hacontract.LocationStatus> responseObserver) {
             String requester = request.getId();

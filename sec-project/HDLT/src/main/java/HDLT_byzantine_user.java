@@ -1,44 +1,34 @@
+import Utils.Utils;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
-
-import userprotocol.*;
+import userprotocol.LocationRequest;
+import userprotocol.Proof;
+import userprotocol.UserProtocolGrpc;
 import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
 
-
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.security.*;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
-
-
-import Utils.Utils;
-import userserver.Key;
-
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
 
 import static java.lang.Integer.parseInt;
 
-public class HDLT_user extends UserProtocolImplBase{
+public class HDLT_byzantine_user extends UserProtocolImplBase{
 
     /*GLOBAL VARIABLES*/
     private static UserProtocolGrpc.UserProtocolBlockingStub blockingStub;
@@ -198,6 +188,7 @@ public class HDLT_user extends UserProtocolImplBase{
             }
         }
 
+
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
         json.addProperty("currentEpoch",currentEpoch);
@@ -222,14 +213,8 @@ public class HDLT_user extends UserProtocolImplBase{
 
         LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
                 .encodeToString(ivSpec.getIV())).setUser(user).build();
-        LocationResponse resp = null;
+        LocationResponse resp = bStub.submitLocationReport(lr);
 
-        try{
-             resp = bStub.submitLocationReport(lr);
-        }catch(Exception e){
-            System.err.println(e.getMessage());
-            return;
-        }
 
         // Desencriptar
         encryptedMessage = resp.getMessage();
@@ -262,32 +247,15 @@ public class HDLT_user extends UserProtocolImplBase{
 
         // Encriptação
 
-        String encryptedMessage = null;
-        IvParameterSpec ivSpec = null;
-        try {
-            ivSpec = Utils.generateIv();
-            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
-                .encodeToString(ivSpec.getIV())).build();
+        String message = json.toString();
+        GetLocation gl = GetLocation.newBuilder().setMessage(message).build();
         LocationStatus resp = bStub.obtainLocationReport(gl);
 
-        encryptedMessage = resp.getMessage();
-        byte[] iv =Base64.getDecoder().decode(resp.getIv());
-        String decryptedMessage = null;
-        try {
-            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+        String response = resp.getMessage();
+
+        // desencriptar
+
+        JsonObject convertedResponse = new Gson().fromJson(response, JsonObject.class);
 
         int XCoord = convertedResponse.get("XCoord").getAsInt();
         int YCoord = convertedResponse.get("YCoord").getAsInt();
@@ -325,7 +293,7 @@ public class HDLT_user extends UserProtocolImplBase{
         try {
             svc = ServerBuilder
                     .forPort(svcPort)
-                    .addService(new HDLT_user())
+                    .addService(new HDLT_byzantine_user())
                     .build();
 
             svc.start();
