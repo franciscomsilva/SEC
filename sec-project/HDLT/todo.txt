@@ -1,3 +1,4 @@
 - Guardar chaves simetricas no servidor em ficheiro para caso de ir abaixo (assumindo que o servidor é honesto)
 - Definir numero minimo de submissoes para aceitar uma location
 - Definir conjunto de scripts para simular attacks no byzantine_user
+- Analisar incluir HMAC no submits

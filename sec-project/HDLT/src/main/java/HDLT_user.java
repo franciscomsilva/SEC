@@ -7,6 +7,7 @@ import com.opencsv.exceptions.CsvValidationException;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 
+import sun.nio.ch.ThreadPool;
 import userprotocol.*;
 import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
@@ -24,6 +25,10 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 
 import Utils.Utils;
@@ -46,7 +51,7 @@ public class HDLT_user extends UserProtocolImplBase{
 
     private static HashMap<String,String> UsersMap = new HashMap<>();
 
-    private static HashMap<String,String> proofers = new HashMap<>();
+    private static ConcurrentHashMap<String,String> proofers = new ConcurrentHashMap<>();
 
     private static SecretKey symmetricKey;
 
@@ -114,7 +119,7 @@ public class HDLT_user extends UserProtocolImplBase{
         return RadiusUsers;
     }
 
-    public static void requestProof(int epoch){
+    public static void requestProof(int epoch) throws InterruptedException {
 
         HashMap<String,double []> RadiusUsers = new HashMap<>();
         try {
@@ -125,16 +130,23 @@ public class HDLT_user extends UserProtocolImplBase{
             e.printStackTrace();
         }
         if(!RadiusUsers.isEmpty()){
+            ExecutorService executorService = Executors.newFixedThreadPool(RadiusUsers.size());
+
             for (Map.Entry<String,double []> entry : RadiusUsers.entrySet()){
-                connectToUser(UsersMap.get(entry.getKey()));
-                try {
-                    LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).build();
-                    Proof proof = blockingStub.requestLocationProof(locationRequest);
-                    proofers.put(proof.getId(),proof.getDigSig());
-                }catch (Exception e){
-                    System.err.println(e.getMessage());
-                }
+                Runnable run = () -> {
+                    connectToUser(UsersMap.get(entry.getKey()));
+                    try {
+                        LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).build();
+                        Proof proof = blockingStub.requestLocationProof(locationRequest);
+                        proofers.put(proof.getId(),proof.getDigSig());
+                    }catch (Exception e){
+                        System.err.println(e.getMessage());
+                    }
+                };
+                executorService.execute(run);
             }
+            Thread.sleep(5000);
+            executorService.shutdownNow();
         }
         else{
             System.out.println("Don't have proofers");
