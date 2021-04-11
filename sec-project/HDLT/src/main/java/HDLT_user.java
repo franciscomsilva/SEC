@@ -40,7 +40,7 @@ import static java.lang.Integer.parseInt;
 
 public class HDLT_user extends UserProtocolImplBase{
 
-    // Variaveis Globais
+    /*GLOBAL VARIABLES*/
     private static UserProtocolGrpc.UserProtocolBlockingStub blockingStub;
     private static UserServerGrpc.UserServerBlockingStub bStub;
 
