@@ -112,6 +112,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
     public static void requestProof(int epoch) throws InterruptedException {
 
         HashMap<String,double []> RadiusUsers = new HashMap<>();
+
         try {
             RadiusUsers = readMap(epoch);
         } catch (IOException e) {
@@ -134,9 +135,9 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                     }
                 };
                 executorService.execute(run);
+                Thread.sleep(1000);
             }
-            Thread.sleep(3000);
-            executorService.shutdownNow();
+
         }
         else{
             System.out.println("Don't have proofers");

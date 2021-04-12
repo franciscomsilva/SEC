@@ -120,7 +120,6 @@ public class HDLT_user extends UserProtocolImplBase{
         } catch (CsvValidationException e) {
             e.printStackTrace();
         }
-        System.out.println(RadiusUsers.size());
         if(!RadiusUsers.isEmpty()){
             ExecutorService executorService = Executors.newFixedThreadPool(RadiusUsers.size());
 
@@ -136,9 +135,9 @@ public class HDLT_user extends UserProtocolImplBase{
                     }
                 };
                 executorService.execute(run);
+                Thread.sleep(1000);
             }
-            Thread.sleep(3000);
-            executorService.shutdownNow();
+
         }
         else{
             System.out.println("Don't have proofers");
@@ -191,11 +190,7 @@ public class HDLT_user extends UserProtocolImplBase{
 
         JsonArray proofersArray = new JsonArray();
 
-        //System.out.println(proofersArray);
 
-        for (Map.Entry<String, String> entry : proofers.entrySet()) {
-            System.out.println(entry.getKey()+":"+entry.getValue());
-        }
         if(!proofers.isEmpty()){
             for (Map.Entry<String, String> entry : proofers.entrySet()) {
                JsonObject o = new JsonObject();
