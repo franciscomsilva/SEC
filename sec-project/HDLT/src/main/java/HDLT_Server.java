@@ -2,8 +2,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.reflect.TypeToken;
 import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvValidationException;
 import hacontract.HAProtocolGrpc;
 import hacontract.UserAtLocation;
@@ -15,12 +15,9 @@ import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import userserver.*;
 
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
+import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.X509EncodedKeySpec;
@@ -31,17 +28,24 @@ import userserver.Key;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import static java.lang.Integer.parseInt;
 
 public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
+    private static String REPORTS_FILE = "location_reports";
+
+    private static String SYMMETRICS_FILE = "symmetric_keys";
+
+    private static Double BYZANTINE_RATIO = 0.5;
+
     private static HashMap<String,String> UsersMap = new HashMap<>();
 
     private static HashMap<Integer,HashMap<String,int[]>> reports = new HashMap<>();
 
-    private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<>();
+    private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<String, SecretKey>();
 
     public static void readUsers() {
         try (CSVReader reader = new CSVReader(new FileReader("Users.txt"))) {
@@ -65,6 +69,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         try {
             secretKey = AESKeyGenerator.write();
             userSymmetricKeys.put(user,secretKey);
+            saveKeysToFile();
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -144,8 +149,9 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         }
         String verify = requester+","+epoch+","+xCoords+","+yCoords;
 
-        Boolean flag = true;
+        int counter = 0;
         Boolean done = false;
+        Double flag = 0.0;
 
         if(!proofers.isEmpty()) {
             for (Map.Entry<String, String> entry : proofers.entrySet()) {
@@ -161,18 +167,16 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
                     if (Utils.verifySignature(verify, entry.getValue(), publicKey)) {
                         System.out.println("Server Signature Verified!");
-                        //flag = true;
                     } else {
                         System.out.println("Server Signature Not Verified!");
-                        flag = false;
-                        //TODO CONTAR O NUMERO DE PROOFERS CORRETO E SO DESCARTAR CASO SEJA MENOR
+                        counter++;
                         break;
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-
-                if (flag) {
+                flag = Double.valueOf(counter)/Double.valueOf(proofers.size());
+                if (flag < BYZANTINE_RATIO) {
                     if (reports.containsKey(epoch)) {
                         HashMap<String, int[]> UsersAt = reports.get(epoch);
                         if (!UsersAt.containsKey(requester)) {
@@ -180,11 +184,18 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                             UsersAt.put(requester, b);
                         }
                         reports.replace(epoch, UsersAt);
+
                     } else {
                         HashMap<String, int[]> a = new HashMap<>();
                         int[] b = {xCoords, yCoords};
                         a.put(requester, b);
                         reports.put(epoch, a);
+                    }
+
+                    try {
+                        saveReportsToFile();
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
 
                     done = true;
@@ -310,13 +321,93 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         }
     }
 
-    public static void main(String[] args){
+    private static void saveReportsToFile() throws IOException {
+        try(BufferedWriter csvWriter = new BufferedWriter(new FileWriter(REPORTS_FILE))){
+            for (Map.Entry<Integer,HashMap<String,int[]>> entry : reports.entrySet()) {
+                for(Map.Entry<String,int[]> entry1 : entry.getValue().entrySet()){
+                    csvWriter.write(entry.getKey() + "," + entry1.getKey() + "," + entry1.getValue()[0] + "," + entry1.getValue()[1]);
+                    csvWriter.newLine();
+
+                }
+            }
+            csvWriter.flush();
+            csvWriter.close();
+        }
+    }
+
+    private static void readReportsFromFile() throws IOException {
+        File f = new File(REPORTS_FILE);
+        if(!f.exists() || f.isDirectory()) {
+            return;
+        }
+
+        try(BufferedReader csvReader = new BufferedReader(new FileReader(REPORTS_FILE))){
+            String line;
+            int epoch = 0;
+            int[] coords = null;
+            String user = null;
+            String[] splits = null;
+            HashMap<String,int[]> map = new HashMap<>();
+
+            while((line = csvReader.readLine()) != null){
+
+                splits = line.split(",");
+                epoch = Integer.parseInt(splits[0]);
+                user = splits[1];
+                coords[0] = Integer.parseInt(splits[2]);
+                coords[1] = Integer.parseInt(splits[3]);
+
+                if(reports.containsKey(epoch)){
+                    map = reports.get(epoch);
+                    map.put(user,coords);
+                    reports.replace(epoch,map);
+                }
+                else{
+                    map.put(user,coords);
+                    reports.put(epoch,map);
+                }
+            }
+        }
+
+    }
+
+    private static void saveKeysToFile() throws IOException {
+
+        try(BufferedWriter csvWriter = new BufferedWriter(new FileWriter(SYMMETRICS_FILE))){
+            for (Map.Entry<String,SecretKey> entry : userSymmetricKeys.entrySet()) {
+                csvWriter.write(entry.getKey() + ',' + Base64.getEncoder().encodeToString(entry.getValue().getEncoded()));
+                csvWriter.newLine();
+            }
+            csvWriter.close();
+        }
+
+    }
+
+    private static void readKeysFromFile() throws IOException {
+        File f = new File(SYMMETRICS_FILE);
+        if(!f.exists() || f.isDirectory()) {
+            return;
+        }
+        try(BufferedReader csvReader = new BufferedReader(new FileReader(SYMMETRICS_FILE))){
+            String line;
+            while((line = csvReader.readLine()) != null){
+                userSymmetricKeys.put(line.split(",")[0],new SecretKeySpec(Base64.getDecoder().decode(line.split(",")[1]),0, 16, "AES"));
+            }
+        }
+
+    }
+
+
+
+    public static void main(String[] args) throws IOException {
         readUsers();
         int svcPort = Integer.parseInt(UsersMap.get("server").split(":")[1]);
         int svcPort_HA = svcPort + 50;
         Server svc = null;
         Server svc_HA = null;
 
+        readKeysFromFile();
+        readReportsFromFile();
 
         try {
             svc = ServerBuilder
@@ -332,6 +423,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
             System.out.println("Server started, listening on " + svcPort);
             System.out.println("Server started, listening on " + svcPort_HA);
+
+
             svc.awaitTermination();
             svc.shutdown();
 

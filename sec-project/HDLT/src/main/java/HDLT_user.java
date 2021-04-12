@@ -7,7 +7,6 @@ import com.opencsv.exceptions.CsvValidationException;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 
-import sun.nio.ch.ThreadPool;
 import userprotocol.*;
 import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
@@ -145,7 +144,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 };
                 executorService.execute(run);
             }
-            Thread.sleep(5000);
+            Thread.sleep(3000);
             executorService.shutdownNow();
         }
         else{
