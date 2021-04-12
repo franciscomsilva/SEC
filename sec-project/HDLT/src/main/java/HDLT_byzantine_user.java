@@ -1,4 +1,3 @@
-import Utils.Utils;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -6,25 +5,31 @@ import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
-import userprotocol.LocationRequest;
-import userprotocol.Proof;
-import userprotocol.UserProtocolGrpc;
+
+import userprotocol.*;
 import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
+
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.PKCS8EncodedKeySpec;
+
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
-import java.security.PrivateKey;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import Utils.Utils;
+import userserver.Key;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 
 import static java.lang.Integer.parseInt;
 
@@ -36,7 +41,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
 
     private static HashMap<String,String> UsersMap = new HashMap<>();
 
-    private static HashMap<String,String> proofers = new HashMap<>();
+    private static ConcurrentHashMap<String,String> proofers = new ConcurrentHashMap<>();
 
     private static SecretKey symmetricKey;
 
@@ -51,7 +56,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         try (CSVReader reader = new CSVReader(new FileReader("Users.txt"))) {
             String[] lineInArray;
             while ((lineInArray = reader.readNext()) != null) {
-               UsersMap.put(lineInArray[0],lineInArray[1]);
+                UsersMap.put(lineInArray[0],lineInArray[1]);
             }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -104,7 +109,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         return RadiusUsers;
     }
 
-    public static void requestProof(int epoch){
+    public static void requestProof(int epoch) throws InterruptedException {
 
         HashMap<String,double []> RadiusUsers = new HashMap<>();
         try {
@@ -115,16 +120,23 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
             e.printStackTrace();
         }
         if(!RadiusUsers.isEmpty()){
+            ExecutorService executorService = Executors.newFixedThreadPool(RadiusUsers.size());
+
             for (Map.Entry<String,double []> entry : RadiusUsers.entrySet()){
-                connectToUser(UsersMap.get(entry.getKey()));
-                try {
-                    LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).build();
-                    Proof proof = blockingStub.requestLocationProof(locationRequest);
-                    proofers.put(proof.getId(),proof.getDigSig());
-                }catch (Exception e){
-                    System.err.println(e.getMessage());
-                }
+                Runnable run = () -> {
+                    connectToUser(UsersMap.get(entry.getKey()));
+                    try {
+                        LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).build();
+                        Proof proof = blockingStub.requestLocationProof(locationRequest);
+                        proofers.put(proof.getId(),proof.getDigSig());
+                    }catch (Exception e){
+                        System.err.println(e.getMessage());
+                    }
+                };
+                executorService.execute(run);
             }
+            Thread.sleep(3000);
+            executorService.shutdownNow();
         }
         else{
             System.out.println("Don't have proofers");
@@ -173,19 +185,18 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         }
     }
 
-    public static void SubmitLocation(){
+    public static void SubmitLocationAttack1(){
 
         JsonArray proofersArray = new JsonArray();
 
-        System.out.println(proofersArray);
-        if(!proofers.isEmpty()){
-            for (Map.Entry<String, String> entry : proofers.entrySet()) {
-               JsonObject o = new JsonObject();
-               o.addProperty("userID",entry.getKey());
-               o.addProperty("digSIG",entry.getValue());
+        HashMap<String,String> emptyProofers = new HashMap();
 
-               proofersArray.add(o);
-            }
+        for (Map.Entry<String, String> entry : emptyProofers.entrySet()) {
+            JsonObject o = new JsonObject();
+            o.addProperty("userID",entry.getKey());
+            o.addProperty("digSIG",entry.getValue());
+
+            proofersArray.add(o);
         }
 
 
@@ -213,8 +224,85 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
 
         LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
                 .encodeToString(ivSpec.getIV())).setUser(user).build();
-        LocationResponse resp = bStub.submitLocationReport(lr);
+        LocationResponse resp = null;
 
+        try{
+            resp = bStub.submitLocationReport(lr);
+        }catch(Exception e){
+            System.out.println(e.getMessage());
+            return;
+        }
+
+        // Desencriptar
+        encryptedMessage = resp.getMessage();
+        byte[] iv =Base64.getDecoder().decode(resp.getIv());
+        String decryptedMessage = null;
+        try {
+            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+        Boolean bool = convertedResponse.get("Done").getAsBoolean();
+
+        if(bool){
+            proofers.clear();
+        }else{
+            System.out.println("Submittion failed!");
+        }
+    }
+
+    public static void SubmitLocation(){
+
+        JsonArray proofersArray = new JsonArray();
+
+        System.out.println(proofersArray);
+        if(!proofers.isEmpty()){
+            for (Map.Entry<String, String> entry : proofers.entrySet()) {
+                JsonObject o = new JsonObject();
+                o.addProperty("userID",entry.getKey());
+                o.addProperty("digSIG",entry.getValue());
+
+                proofersArray.add(o);
+            }
+        }
+
+        JsonObject json = new JsonObject();
+        json.addProperty("userID", user);
+        json.addProperty("currentEpoch",currentEpoch);
+        json.addProperty("xCoord",x);
+        json.addProperty("yCoord",y);
+        json.add("proofers",proofersArray);
+
+
+        System.out.println(json.toString());
+
+        // Encriptação
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
+        try {
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).setUser(user).build();
+        LocationResponse resp = null;
+
+        try{
+            resp = bStub.submitLocationReport(lr);
+        }catch(Exception e){
+            System.out.println(e.getMessage());
+            return;
+        }
 
         // Desencriptar
         encryptedMessage = resp.getMessage();
@@ -247,15 +335,32 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
 
         // Encriptação
 
-        String message = json.toString();
-        GetLocation gl = GetLocation.newBuilder().setMessage(message).build();
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
+        try {
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).build();
         LocationStatus resp = bStub.obtainLocationReport(gl);
 
-        String response = resp.getMessage();
-
-        // desencriptar
-
-        JsonObject convertedResponse = new Gson().fromJson(response, JsonObject.class);
+        encryptedMessage = resp.getMessage();
+        byte[] iv =Base64.getDecoder().decode(resp.getIv());
+        String decryptedMessage = null;
+        try {
+            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
 
         int XCoord = convertedResponse.get("XCoord").getAsInt();
         int YCoord = convertedResponse.get("YCoord").getAsInt();
@@ -293,7 +398,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         try {
             svc = ServerBuilder
                     .forPort(svcPort)
-                    .addService(new HDLT_byzantine_user())
+                    .addService(new HDLT_user())
                     .build();
 
             svc.start();
@@ -316,23 +421,23 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                 String line = scanner.nextLine();
                 String cmd = line.split(" ")[0];
                 switch (cmd) {
-                    case "RequestProof":
-                    case "r":
-                        System.out.println("Requesting Location Proof to nearby users");
-                        requestProof(currentEpoch);
+                    case "Attack1":
+                    case "a1":
+                        System.out.println("Sending a empty submition to a server");
+                        SubmitLocationAttack1();
                         break;
-                    case "SubmitLocation":
-                    case "s":
+                    case "Attack2":
+                    case "a2":
                         System.out.println("Submitting Location");
                         SubmitLocation();
                         break;
-                    case "ObtainLocation":
-                    case "o":
+                    case "Attack3":
+                    case "a3":
                         int epoch = Integer.parseInt(line.split(" ")[1]);
                         System.out.println("Obtaining Location of " + user + " at epoch " + epoch);
                         ObtainLocation(epoch);
                         break;
-                    case "Sleep":
+                    case "Attack4":
                         Thread.sleep(Integer.parseInt(line.split(" ")[1]));
                         break;
                     case "Epoch":
@@ -353,3 +458,6 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         svc.shutdown();
     }
 }
+
+
+

@@ -346,13 +346,12 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         try(BufferedReader csvReader = new BufferedReader(new FileReader(REPORTS_FILE))){
             String line;
             int epoch = 0;
-            int[] coords = null;
+            int[] coords = {0,0};
             String user = null;
             String[] splits = null;
             HashMap<String,int[]> map = new HashMap<>();
 
             while((line = csvReader.readLine()) != null){
-
                 splits = line.split(",");
                 epoch = Integer.parseInt(splits[0]);
                 user = splits[1];
@@ -396,10 +395,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 userSymmetricKeys.put(line.split(",")[0],new SecretKeySpec(Base64.getDecoder().decode(line.split(",")[1]),0, 16, "AES"));
             }
         }
-
     }
-
-
 
     public static void main(String[] args) throws IOException {
         readUsers();

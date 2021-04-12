@@ -1,6 +1,5 @@
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
@@ -12,11 +11,9 @@ import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
 
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
-import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 
 import java.io.BufferedReader;
@@ -27,16 +24,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
 
 import Utils.Utils;
 import userserver.Key;
 
-
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 
@@ -121,6 +112,7 @@ public class HDLT_user extends UserProtocolImplBase{
     public static void requestProof(int epoch) throws InterruptedException {
 
         HashMap<String,double []> RadiusUsers = new HashMap<>();
+
         try {
             RadiusUsers = readMap(epoch);
         } catch (IOException e) {
@@ -128,6 +120,7 @@ public class HDLT_user extends UserProtocolImplBase{
         } catch (CsvValidationException e) {
             e.printStackTrace();
         }
+        System.out.println(RadiusUsers.size());
         if(!RadiusUsers.isEmpty()){
             ExecutorService executorService = Executors.newFixedThreadPool(RadiusUsers.size());
 
@@ -198,7 +191,11 @@ public class HDLT_user extends UserProtocolImplBase{
 
         JsonArray proofersArray = new JsonArray();
 
-        System.out.println(proofersArray);
+        //System.out.println(proofersArray);
+
+        for (Map.Entry<String, String> entry : proofers.entrySet()) {
+            System.out.println(entry.getKey()+":"+entry.getValue());
+        }
         if(!proofers.isEmpty()){
             for (Map.Entry<String, String> entry : proofers.entrySet()) {
                JsonObject o = new JsonObject();
@@ -238,7 +235,7 @@ public class HDLT_user extends UserProtocolImplBase{
         try{
              resp = bStub.submitLocationReport(lr);
         }catch(Exception e){
-            System.err.println(e.getMessage());
+            System.out.println(e.getMessage());
             return;
         }
 
