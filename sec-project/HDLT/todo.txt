@@ -1,4 +1,8 @@
 - Receber o numero de users e calcular numero minimo de proofers
-- Definir scripts para iniciar servidores e utilizadores de forma dinamica (numero dinamico de users)
-- Definir conjunto de scripts para simular attacks no byzantine_user
+- Definir script que:
+    - Iniciar servidor e numero dinamico de utilizadores (gerando os certificados)
+    - Inicie numero fixo de byzantine users
+    - Apresente diferentes tipos de testes de ataques e a opção de os executar
+- Definir codigo com exemplos de ataques no byzantine user
 - Analisar incluir HMAC no submits
+- Relatorio
