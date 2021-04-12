@@ -1,3 +1,4 @@
-- Definir numero minimo de submissoes para aceitar uma location
+- Receber o numero de users e calcular numero minimo de proofers
+- Definir scripts para iniciar servidores e utilizadores de forma dinamica (numero dinamico de users)
 - Definir conjunto de scripts para simular attacks no byzantine_user
 - Analisar incluir HMAC no submits

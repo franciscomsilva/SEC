@@ -41,6 +41,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
     private static Double BYZANTINE_RATIO = 0.5;
 
+    private static int MIN_PROOFERS = 0;
+
     private static HashMap<String,String> UsersMap = new HashMap<>();
 
     private static HashMap<Integer,HashMap<String,int[]>> reports = new HashMap<>();
