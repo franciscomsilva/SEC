@@ -1,6 +1,7 @@
 - Definir script que:
-    - Inicie numero fixo de user e byzantine users
-    - Apresente diferentes tipos de testes de ataques e a opção de os executar
+    - Inicie numero fixo de user (10) e byzantine users (3)
+    - Permite inicar rotina de testes
+    - Permite inicar rotina normal
 - Definir codigo com exemplos de ataques no byzantine user - done
 - Definir testes automaticos, com diferentes sequencias de comandos
 - Analisar incluir HMAC no submits
