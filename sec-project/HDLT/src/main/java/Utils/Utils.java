@@ -17,7 +17,7 @@ import java.util.Arrays;
 import java.util.Base64;
 
 
-public final class Utils {
+public class Utils {
     private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
     private static final String MODE = "OFB";
     private static IvParameterSpec iv;

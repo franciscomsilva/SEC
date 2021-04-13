@@ -11,6 +11,7 @@ import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
 
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
@@ -20,6 +21,7 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.sql.SQLOutput;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -50,6 +52,8 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
     private static int y;
 
     private static int currentEpoch;
+
+    private static int operation_mode = 0;
 
 
     public static void readUsers() {
@@ -146,43 +150,103 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
 
     @Override
     public void requestLocationProof(LocationRequest request, StreamObserver<Proof> responseObserver)  {
-        //Geração da Proof
-        String id = request.getId();
-        int xCoord = request.getXCoord();
-        int yCoord = request.getYCoord();
-        int epoch = request.getEpoch();
 
-        try{
-            HashMap<String,double []> users = readMap(epoch);
-            // Verificação se o requisitante está perto deste user
-            if(users.containsKey(id)){
-                double [] coords = users.get(id);
-                if (xCoord == coords[1] && yCoord == coords[2]){
-                    String msg = id +","+epoch+","+xCoord+","+yCoord;
+        if(operation_mode == 0){
+            //Geração da Proof
+            String id = request.getId();
+            int xCoord = request.getXCoord();
+            int yCoord = request.getYCoord();
+            int epoch = request.getEpoch();
 
-                    /*READS PRIVATE  KEY TO SIGN */
-                    byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
-                    PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
-                    KeyFactory kf = KeyFactory.getInstance("RSA");
-                    PrivateKey privateKey = kf.generatePrivate(specPriv);
+            try{
+                HashMap<String,double []> users = readMap(epoch);
+                // Verificação se o requisitante está perto deste user
+                if(users.containsKey(id)){
+                    double [] coords = users.get(id);
+                    if (xCoord == coords[1] && yCoord == coords[2]){
+                        String msg = id +","+epoch+","+xCoord+","+yCoord;
 
-                    byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
+                        /*READS PRIVATE  KEY TO SIGN */
+                        byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
+                        PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
+                        KeyFactory kf = KeyFactory.getInstance("RSA");
+                        PrivateKey privateKey = kf.generatePrivate(specPriv);
 
-                    Proof pf = Proof.newBuilder().setId(user).setDigSig(new String(Base64.getEncoder().encode(digitalSignatureToSent))).build();
+                        byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
 
-                    responseObserver.onNext(pf);
-                    responseObserver.onCompleted();
+                        Proof pf = Proof.newBuilder().setId(user).setDigSig(new String(Base64.getEncoder().encode(digitalSignatureToSent))).build();
+
+                        responseObserver.onNext(pf);
+                        responseObserver.onCompleted();
+                    }else{
+                        /*USER NOT IN THE PROVIDED POSITION*/
+                        throw new Exception("ERROR: User not in the provided position");
+                    }
                 }else{
-                    /*USER NOT IN THE PROVIDED POSITION*/
-                    throw new Exception("ERROR: User not in the provided position");
+                    /*USER NOT IN MAP RANGE*/
+                    throw new Exception("ERROR: User not in map range " + user);
                 }
-            }else{
-                /*USER NOT IN MAP RANGE*/
-                throw new Exception("ERROR: User not in map range");
-            }
 
+            } catch (Exception e) {
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription(e.getMessage()))));
+            }
+        }else if(operation_mode == 1){
+            /*SLEEPS THE THREAD TO TIMEOUT THE REQUEST*/
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+    }
+
+    public static void SubmitLocation() {
+
+        JsonArray proofersArray = new JsonArray();
+
+
+        if (!proofers.isEmpty()) {
+            for (Map.Entry<String, String> entry : proofers.entrySet()) {
+                JsonObject o = new JsonObject();
+                o.addProperty("userID", entry.getKey());
+                o.addProperty("digSIG", entry.getValue());
+
+                proofersArray.add(o);
+            }
+        }
+
+        JsonObject json = new JsonObject();
+        json.addProperty("userID", user);
+        json.addProperty("currentEpoch", currentEpoch);
+        json.addProperty("xCoord", x);
+        json.addProperty("yCoord", y);
+        json.add("proofers", proofersArray);
+
+
+        System.out.println(json.toString());
+
+        // Encriptação
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
+        try {
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey, json.toString(), ivSpec);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).setUser(user).build();
+        LocationResponse resp = null;
+
+        try {
+            resp = bStub.submitLocationReport(lr);
         } catch (Exception e) {
-            responseObserver.onError(new StatusException((Status.ABORTED.withDescription(e.getMessage()))));
+            System.err.println(e.getMessage());
+            return;
         }
     }
 
@@ -257,11 +321,160 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         }
     }
 
-    public static void SubmitLocation(){
+    public static void SubmitLocationDifferentUserID(){
 
         JsonArray proofersArray = new JsonArray();
 
         System.out.println(proofersArray);
+        if(!proofers.isEmpty()){
+            for (Map.Entry<String, String> entry : proofers.entrySet()) {
+                JsonObject o = new JsonObject();
+                o.addProperty("userID",entry.getKey());
+                o.addProperty("digSIG",entry.getValue());
+
+                proofersArray.add(o);
+            }
+        }
+
+        JsonObject json = new JsonObject();
+        json.addProperty("userID", "u1");
+        json.addProperty("currentEpoch",currentEpoch);
+        json.addProperty("xCoord",x);
+        json.addProperty("yCoord",y);
+        json.add("proofers",proofersArray);
+
+
+        System.out.println(json.toString());
+
+        // Encriptação
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
+        try {
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).setUser(user).build();
+        LocationResponse resp = null;
+
+        try{
+            resp = bStub.submitLocationReport(lr);
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+            return;
+        }
+
+        // Desencriptar
+        encryptedMessage = resp.getMessage();
+        byte[] iv =Base64.getDecoder().decode(resp.getIv());
+        String decryptedMessage = null;
+        try {
+            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+        Boolean bool = convertedResponse.get("Done").getAsBoolean();
+
+        if(bool){
+            proofers.clear();
+        }else{
+            System.out.println("Submittion failed!");
+        }
+    }
+
+    public static void SubmitLocationDifferentUserIDRequester(){
+
+        JsonArray proofersArray = new JsonArray();
+
+        System.out.println(proofersArray);
+        if(!proofers.isEmpty()){
+            for (Map.Entry<String, String> entry : proofers.entrySet()) {
+                JsonObject o = new JsonObject();
+                o.addProperty("userID",entry.getKey());
+                o.addProperty("digSIG",entry.getValue());
+
+                proofersArray.add(o);
+            }
+        }
+
+        JsonObject json = new JsonObject();
+        json.addProperty("userID", user);
+        json.addProperty("currentEpoch",currentEpoch);
+        json.addProperty("xCoord",x);
+        json.addProperty("yCoord",y);
+        json.add("proofers",proofersArray);
+
+
+        System.out.println(json.toString());
+
+        // Encriptação
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
+        try {
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).setUser("u1").build();
+        LocationResponse resp = null;
+
+        try{
+            resp = bStub.submitLocationReport(lr);
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+            return;
+        }
+
+        // Desencriptar
+        encryptedMessage = resp.getMessage();
+        byte[] iv =Base64.getDecoder().decode(resp.getIv());
+        String decryptedMessage = null;
+        try {
+            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+        Boolean bool = convertedResponse.get("Done").getAsBoolean();
+
+        if(bool){
+            proofers.clear();
+        }else{
+            System.out.println("Submittion failed!");
+        }
+    }
+
+    public static void SubmitLocationWithAlteredDigSig(){
+
+        JsonArray proofersArray = new JsonArray();
+
+        /*CHANGES FIRST CHAR OF DIGITAL SIGNATURE*/
+
+        Map.Entry<String,String> firstEntry = proofers.entrySet().iterator().next();
+        byte[] byteArray = firstEntry.getValue().getBytes(StandardCharsets.UTF_8);
+        byteArray[0] = 'f';
+        firstEntry.setValue(new String(byteArray));
+        proofers.replace(firstEntry.getKey(),firstEntry.getValue());
+
         if(!proofers.isEmpty()){
             for (Map.Entry<String, String> entry : proofers.entrySet()) {
                 JsonObject o = new JsonObject();
@@ -301,7 +514,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         try{
             resp = bStub.submitLocationReport(lr);
         }catch(Exception e){
-            System.out.println(e.getMessage());
+            System.err.println(e.getMessage());
             return;
         }
 
@@ -374,8 +587,10 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
 
         //Ler ficheiro com os endereços dos utilizadores
         readUsers();
-        //Obter o próprio Utilizador bem como o port
+        //READ COMMAND LINE ARGUMENTS
         user = args[0];
+
+
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
         //Conexão com o servidor
@@ -399,7 +614,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         try {
             svc = ServerBuilder
                     .forPort(svcPort)
-                    .addService(new HDLT_user())
+                    .addService(new HDLT_byzantine_user())
                     .build();
 
             svc.start();
@@ -429,17 +644,33 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                         break;
                     case "Attack2":
                     case "a2":
-                        System.out.println("Submitting Location");
-                        SubmitLocation();
+                        System.out.println("Dropping a proofer request from another user");
+                        operation_mode = 1;
                         break;
                     case "Attack3":
                     case "a3":
-                        int epoch = Integer.parseInt(line.split(" ")[1]);
-                        System.out.println("Obtaining Location of " + user + " at epoch " + epoch);
-                        ObtainLocation(epoch);
+                        System.out.println("Requesting proofers and sending location report with fake userID");
+                        requestProof(currentEpoch);
+                        SubmitLocationDifferentUserID();
                         break;
                     case "Attack4":
-                        Thread.sleep(Integer.parseInt(line.split(" ")[1]));
+                    case "a4":
+                        System.out.println("Requesting proofers and sending location report with fake requester userID");
+                        requestProof(currentEpoch);
+                        SubmitLocationDifferentUserIDRequester();
+                        break;
+                    case "Attack 5":
+                    case "a5":
+                        System.out.println("Requestion proofers and sending location report with altered digital signature");
+                        requestProof(currentEpoch);
+                        SubmitLocationWithAlteredDigSig();
+                        break;
+                    case "Attack 6":
+                    case "a6":
+                        System.out.println("Requesting proofers and sending replaying submission");
+                        requestProof(currentEpoch);
+                        SubmitLocation();
+                        SubmitLocation();
                         break;
                     case "Epoch":
                     case "e":

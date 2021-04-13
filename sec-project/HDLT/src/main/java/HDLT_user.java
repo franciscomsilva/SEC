@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import Utils.Utils;
 import userserver.Key;
@@ -136,6 +137,9 @@ public class HDLT_user extends UserProtocolImplBase{
                 };
                 executorService.execute(run);
                 Thread.sleep(1000);
+                if(executorService.awaitTermination(500, TimeUnit.MILLISECONDS)){
+                    executorService.shutdownNow();
+                }
             }
 
         }
@@ -178,7 +182,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 }
             }else{
                 /*USER NOT IN MAP RANGE*/
-                throw new Exception("ERROR: User not in map range");
+                throw new Exception("ERROR: User not in map range a" + user);
             }
 
         } catch (Exception e) {
@@ -230,7 +234,7 @@ public class HDLT_user extends UserProtocolImplBase{
         try{
              resp = bStub.submitLocationReport(lr);
         }catch(Exception e){
-            System.out.println(e.getMessage());
+            System.err.println(e.getMessage());
             return;
         }
 
@@ -253,7 +257,7 @@ public class HDLT_user extends UserProtocolImplBase{
         if(bool){
             proofers.clear();
         }else{
-            System.out.println("Submittion failed!");
+            System.err.println("Submittion failed!");
         }
     }
 

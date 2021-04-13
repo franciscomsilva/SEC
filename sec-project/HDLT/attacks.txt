@@ -1,3 +1,6 @@
-- Enviar uma mensagem com userID diferente do requester
-- Enviar uma mensagem com userID forjado (diferente da simmetric key)
-- Enviar um location submit replay
+- Enviar uma mensagem com userID diferente do requester - done a3
+- Enviar uma mensagem com userID forjado (diferente da simmetric key) -- done a4
+- Enviar uma mensagem com digSIG do proofer errada - done a5
+- Enviar um location submit replay - done a6
+- Dar drop de mensagem - Done a2
+- Enviar location report com proofers vazios - a1

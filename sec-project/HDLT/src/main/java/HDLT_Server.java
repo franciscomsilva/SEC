@@ -104,18 +104,19 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         //Decoding
         String message = null;
         String user = null;
+        JsonObject convertedRequest = null;
         try {
             byte[] iv = Base64.getDecoder().decode(request.getIv());
             user = request.getUser();
             String encryptedMessage = request.getMessage();
             message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
+            convertedRequest= new Gson().fromJson(message, JsonObject.class);
         } catch (Exception e) {
             System.err.print("ERROR: Invalid key");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
             return;
         }
 
-        JsonObject convertedRequest= new Gson().fromJson(message, JsonObject.class);
         String requester = convertedRequest.get("userID").getAsString();
 
         if(!requester.equals(user)){
@@ -168,14 +169,16 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     PublicKey publicKey = kf.generatePublic(specPublic);
 
                     if (Utils.verifySignature(verify, entry.getValue(), publicKey)) {
-                        System.out.println("Server Signature Verified!");
+                        System.out.println("Proofer Signature Verified!");
                     } else {
-                        System.out.println("Server Signature Not Verified!");
+                        System.out.println("Proofer Signature Not Verified!");
                         counter++;
                         break;
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    System.out.println("Proofer Signature Not Verified!");
+                    counter++;
+                    break;
                 }
                 flag = Double.valueOf(counter)/Double.valueOf(proofers.size());
                 if (flag < BYZANTINE_RATIO) {
