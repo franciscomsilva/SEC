@@ -197,6 +197,47 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+        }else if(operation_mode == 2){
+            responseObserver.onError(new StatusException(Status.CANCELLED.withDescription("Rejected")));
+        }else if(operation_mode == 3){
+            //Geração da Proof
+            String id = request.getId();
+            int xCoord = request.getXCoord();
+            int yCoord = request.getYCoord();
+            int epoch = request.getEpoch();
+
+            try{
+                HashMap<String,double []> users = readMap(epoch);
+                // Verificação se o requisitante está perto deste user
+                if(users.containsKey(id)){
+                    double [] coords = users.get(id);
+                    if (xCoord == coords[1] && yCoord == coords[2]){
+                        String msg = id +","+epoch+","+5+","+5;
+
+                        /*READS PRIVATE  KEY TO SIGN */
+                        byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
+                        PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
+                        KeyFactory kf = KeyFactory.getInstance("RSA");
+                        PrivateKey privateKey = kf.generatePrivate(specPriv);
+
+                        byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
+
+                        Proof pf = Proof.newBuilder().setId(user).setDigSig(new String(Base64.getEncoder().encode(digitalSignatureToSent))).build();
+
+                        responseObserver.onNext(pf);
+                        responseObserver.onCompleted();
+                    }else{
+                        /*USER NOT IN THE PROVIDED POSITION*/
+                        throw new Exception("ERROR: User not in the provided position");
+                    }
+                }else{
+                    /*USER NOT IN MAP RANGE*/
+                    throw new Exception("ERROR: User not in map range " + user);
+                }
+
+            } catch (Exception e) {
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription(e.getMessage()))));
+            }
         }
 
     }
@@ -672,13 +713,28 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                         SubmitLocation();
                         SubmitLocation();
                         break;
+                    case "Attack 7":
+                    case "a7":
+                        System.out.println("Rejecting a proofer request from another user");
+                        operation_mode = 2;
+                        break;
+                    case "Attack 8":
+                    case "a8":
+                        System.out.println("Sending a proofer request to another user with spoofed location");
+                        operation_mode = 3;
+                        break;
+                    case "Reset Operation Mode":
+                    case "reset":
+                        System.out.println("Resetting operation mode");
+                        operation_mode = 0;
+                        break;
                     case "Epoch":
                     case "e":
                         currentEpoch = Integer.parseInt(line.split(" ")[1]);
                         System.out.println("Setting time to Epoch " + currentEpoch);
                         break;
                     default:
-                        System.out.println("Some errors in reading of the script");
+                        System.out.println("Invalid command!");
                 }
                 //line = reader.readLine();
             }

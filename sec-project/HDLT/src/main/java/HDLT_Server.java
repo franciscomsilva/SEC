@@ -145,11 +145,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             proofers.put(obj.get("userID").getAsString(),obj.get("digSIG").getAsString());
         }
 
-
-
-        for (Map.Entry<String, String> entry : proofers.entrySet()) {
-            System.out.println(entry.getKey()+":"+entry.getValue());
-        }
         String verify = requester+","+epoch+","+xCoords+","+yCoords;
 
         int counter = 0;
@@ -158,7 +153,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
         if(!proofers.isEmpty()) {
             for (Map.Entry<String, String> entry : proofers.entrySet()) {
-                System.out.println("For " + entry.getKey() + " verifing " + entry.getValue());
 
                 KeyFactory kf = null;
                 try {
@@ -169,17 +163,16 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     PublicKey publicKey = kf.generatePublic(specPublic);
 
                     if (Utils.verifySignature(verify, entry.getValue(), publicKey)) {
-                        System.out.println("Proofer Signature Verified!");
+                        System.out.println("Proofer " + entry.getKey() + " Signature Verified!");
                     } else {
-                        System.out.println("Proofer Signature Not Verified!");
+                        System.out.println("Proofer " + entry.getKey() + " Signature Not Verified!");
                         counter++;
-                        break;
                     }
                 } catch (Exception e) {
-                    System.out.println("Proofer Signature Not Verified!");
+                    System.out.println("Proofer " + entry.getKey() + " Signature Not Verified!");
                     counter++;
-                    break;
                 }
+            }
                 flag = Double.valueOf(counter)/Double.valueOf(proofers.size());
                 if (flag < BYZANTINE_RATIO) {
                     if (reports.containsKey(epoch)) {
@@ -207,7 +200,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 } else {
                     done = false;
                 }
-            }
         }
         else{
             done = false;

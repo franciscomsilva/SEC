@@ -4,3 +4,5 @@
 - Enviar um location submit replay - done a6
 - Dar drop de mensagem - Done a2
 - Enviar location report com proofers vazios - a1
+- Rejeitar um proofer request de um user - a7
+- Enviar um proofer request com a location alterada - a8se
