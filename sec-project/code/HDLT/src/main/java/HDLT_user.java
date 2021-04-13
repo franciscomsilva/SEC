@@ -354,9 +354,6 @@ public class HDLT_user extends UserProtocolImplBase{
         //Ler um Script com os requests de cada utilizador
         BufferedReader reader;
         try {
-            //reader = new BufferedReader(new FileReader(user + ".txt"));
-            //String line = reader.readLine();
-            //while (line != null) {
             Scanner scanner = new Scanner(System.in);
             while(true){
                 System.out.print("Epoch "+currentEpoch+"> ");
@@ -392,8 +389,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 }
                 //line = reader.readLine();
             }
-            //reader.close();
-            //while (true);
+
         } catch (Exception e) {
             e.printStackTrace();
         }
