@@ -284,11 +284,19 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             String requester = request.getId();
             int epoch = request.getEp();
             int[] coords = {0,0};
+
             if(reports.containsKey(epoch)) {
                 HashMap<String, int[]> UsersAt = reports.get(epoch);
                 if (UsersAt.containsKey(requester)) {
                     coords = UsersAt.get(requester);
+                    /*USER NOT IN THAT EPOCH*/
+                }else{
+                    responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: User not in the requested epoch")));
                 }
+            }
+            /*NO REPORTS ON THE REQUESTED EPOCH*/
+            else{
+                responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No reports for the requested epoch")));
             }
             hacontract.LocationStatus ls = hacontract.LocationStatus.newBuilder().setXCoord(coords[0]).setYCoord(coords[1]).build();
             responseObserver.onNext(ls);

@@ -271,6 +271,7 @@ public class HDLT_user extends UserProtocolImplBase{
 
         String encryptedMessage = null;
         IvParameterSpec ivSpec = null;
+        LocationStatus resp = null;
         try {
             ivSpec = Utils.generateIv();
             encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
@@ -282,7 +283,11 @@ public class HDLT_user extends UserProtocolImplBase{
 
         GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
                 .encodeToString(ivSpec.getIV())).build();
-        LocationStatus resp = bStub.obtainLocationReport(gl);
+        try{
+            resp = bStub.obtainLocationReport(gl);
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+        }
 
         encryptedMessage = resp.getMessage();
         byte[] iv =Base64.getDecoder().decode(resp.getIv());

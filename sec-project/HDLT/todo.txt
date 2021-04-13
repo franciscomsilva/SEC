@@ -1,8 +1,7 @@
-- Receber o numero de users e calcular numero minimo de proofers
 - Definir script que:
-    - Inicie numero fixo de byzantine users
+    - Inicie numero fixo de user e byzantine users
     - Apresente diferentes tipos de testes de ataques e a opção de os executar
-- Definir codigo com exemplos de ataques no byzantine user
+- Definir codigo com exemplos de ataques no byzantine user - done
 - Definir testes automaticos, com diferentes sequencias de comandos
 - Analisar incluir HMAC no submits
 - Relatorio
