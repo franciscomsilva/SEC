@@ -35,22 +35,18 @@ import static java.lang.Integer.parseInt;
 public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
-    private static String REPORTS_FILE = "location_reports";
-
-    private static String SYMMETRICS_FILE = "symmetric_keys";
+    private static String REPORTS_FILE = "files/location_reports";
+    private static String SYMMETRICS_FILE = "files/symmetric_keys";
+    private static String USERS_CONNECTION_FILE = "files/users_connection.txt";
 
     private static Double BYZANTINE_RATIO = 0.5;
-
     private static int MIN_PROOFERS = 0;
-
     private static HashMap<String,String> UsersMap = new HashMap<>();
-
     private static HashMap<Integer,HashMap<String,int[]>> reports = new HashMap<>();
-
     private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<String, SecretKey>();
 
     public static void readUsers() {
-        try (CSVReader reader = new CSVReader(new FileReader("Users.txt"))) {
+        try (CSVReader reader = new CSVReader(new FileReader(USERS_CONNECTION_FILE))) {
             String[] lineInArray;
             while ((lineInArray = reader.readNext()) != null) {
                 UsersMap.put(lineInArray[0],lineInArray[1]);

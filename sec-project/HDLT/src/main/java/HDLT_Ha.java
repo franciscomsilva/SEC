@@ -22,7 +22,7 @@ public class HDLT_Ha {
     static HAProtocolGrpc.HAProtocolBlockingStub bStub;//TODO Mudar o tipo de stub consoante o contracto
 
     public static void readUsers() {
-        try (CSVReader reader = new CSVReader(new FileReader("Users.txt"))) {
+        try (CSVReader reader = new CSVReader(new FileReader("users_connection.txt"))) {
             String[] lineInArray;
             while ((lineInArray = reader.readNext()) != null) {
                 UsersMap.put(lineInArray[0],lineInArray[1]);

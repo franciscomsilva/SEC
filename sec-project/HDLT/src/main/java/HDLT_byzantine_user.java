@@ -40,6 +40,8 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
     /*GLOBAL VARIABLES*/
     private static UserProtocolGrpc.UserProtocolBlockingStub blockingStub;
     private static UserServerGrpc.UserServerBlockingStub bStub;
+    private static String USERS_CONNECTION_FILE = "files/users_connection.txt";
+    private static String MAP_GRID_FILE = "files/map_grid.txt";
 
     private static HashMap<String,String> UsersMap = new HashMap<>();
 
@@ -57,7 +59,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
 
 
     public static void readUsers() {
-        try (CSVReader reader = new CSVReader(new FileReader("Users.txt"))) {
+        try (CSVReader reader = new CSVReader(new FileReader(USERS_CONNECTION_FILE))) {
             String[] lineInArray;
             while ((lineInArray = reader.readNext()) != null) {
                 UsersMap.put(lineInArray[0],lineInArray[1]);
@@ -85,7 +87,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
     public static  HashMap<String,double []> readMap(int epoch) throws IOException, CsvValidationException {
         List<String[]> UsersInMap = new ArrayList<>();
 
-        try (CSVReader reader = new CSVReader(new FileReader("MAP.txt"))) {
+        try (CSVReader reader = new CSVReader(new FileReader(MAP_GRID_FILE))) {
             String[] lineInArray;
             while ((lineInArray = reader.readNext()) != null) {
                 if(parseInt(lineInArray[1]) == epoch ) {
