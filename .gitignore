@@ -4,6 +4,7 @@
 *.iws
 *.iml
 *.ipr
-sec-project/java
+sec-project/maven
+sec-project/m2
 out
 
