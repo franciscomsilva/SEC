@@ -35,9 +35,9 @@ import static java.lang.Integer.parseInt;
 public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
-    private static String REPORTS_FILE = "files/location_reports";
-    private static String SYMMETRICS_FILE = "files/symmetric_keys";
-    private static String USERS_CONNECTION_FILE = "files/users_connection.txt";
+    private static String REPORTS_FILE = System.getProperty("user.dir") + "/files/location_reports";
+    private static String SYMMETRICS_FILE = System.getProperty("user.dir") + "/files/symmetric_keys";
+    private static String USERS_CONNECTION_FILE =  System.getProperty("user.dir") + "/files/users_connection.txt";
 
     private static Double BYZANTINE_RATIO = 0.5;
     private static int MIN_PROOFERS = 0;

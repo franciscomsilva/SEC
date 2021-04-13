@@ -16,7 +16,6 @@ def switcher(i):
     return switcher.get(i,"\nERROR: Wrong option!\n")()
 
 def main():
-   
     option = 0;
 
     while(option != '4'):

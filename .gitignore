@@ -4,5 +4,6 @@
 *.iws
 *.iml
 *.ipr
+sec-project/java
 out
 
