@@ -3,4 +3,9 @@ u2,localhost:2002
 u3,localhost:2003
 u4,localhost:2004
 u5,localhost:2005
+u6,localhost:2006
+u7,localhost:2007
+u8,localhost:2008
+u9,localhost:2009
+u10,localhost:2010
 server,localhost:2050

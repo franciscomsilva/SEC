@@ -736,12 +736,9 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                         System.out.println("Setting time to Epoch " + currentEpoch);
                         break;
                     default:
-                        System.out.println("Invalid command!");
+                        System.out.println("ERROR: Incorrect command");
                 }
-                //line = reader.readLine();
             }
-            //reader.close();
-            //while (true);
         } catch (Exception e) {
             e.printStackTrace();
         }

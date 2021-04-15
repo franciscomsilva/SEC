@@ -131,7 +131,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 Runnable run = () -> {
                     connectToUser(UsersMap.get(entry.getKey()));
                     try {
-                        LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).build();
+                        LocationRequest locationRequest = LocationRequest.newBuilder().setId(user).setXCoord(x).setYCoord(y).setEpoch(epoch).build();
                         Proof proof = blockingStub.requestLocationProof(locationRequest);
                         proofers.put(proof.getId(),proof.getDigSig());
                     }catch (Exception e){
@@ -185,7 +185,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 }
             }else{
                 /*USER NOT IN MAP RANGE*/
-                throw new Exception("ERROR: User not in map range a" + user);
+                throw new Exception("ERROR: User not in map range" + user);
             }
 
         } catch (Exception e) {
@@ -290,6 +290,7 @@ public class HDLT_user extends UserProtocolImplBase{
             resp = bStub.obtainLocationReport(gl);
         }catch(Exception e){
             System.err.println(e.getMessage());
+            return;
         }
 
         encryptedMessage = resp.getMessage();
@@ -385,9 +386,8 @@ public class HDLT_user extends UserProtocolImplBase{
                         System.out.println("Setting time to Epoch " + currentEpoch);
                         break;
                     default:
-                        System.out.println("Some errors in reading of the script");
+                        System.out.println("ERROR: Incorrect command");
                 }
-                //line = reader.readLine();
             }
 
         } catch (Exception e) {

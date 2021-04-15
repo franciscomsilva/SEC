@@ -35,9 +35,9 @@ import static java.lang.Integer.parseInt;
 public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
-    private static String REPORTS_FILE = System.getProperty("user.dir") + "/files/location_reports";
-    private static String SYMMETRICS_FILE = System.getProperty("user.dir") + "/files/symmetric_keys";
-    private static String USERS_CONNECTION_FILE =  System.getProperty("user.dir") + "/files/users_connection.txt";
+    private static String REPORTS_FILE = "files/location_reports";
+    private static String SYMMETRICS_FILE = "files/symmetric_keys";
+    private static String USERS_CONNECTION_FILE =  "files/users_connection.txt";
 
     private static Double BYZANTINE_RATIO = 0.5;
     private static int MIN_PROOFERS = 0;
@@ -188,12 +188,14 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
                     try {
                         saveReportsToFile();
+                        System.out.println("INFO: Location report submitted!");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
 
                     done = true;
                 } else {
+                    System.err.println("ERROR: Location report invalid!");
                     done = false;
                 }
         }
@@ -205,8 +207,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         json.addProperty("Done",done);
 
         //Encriptação
-
-
         String resp = null;
         IvParameterSpec iv = null;
         try {
@@ -227,19 +227,18 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     public void obtainLocationReport(GetLocation request, StreamObserver<LocationStatus> responseObserver) {
         //Decoding
         String message = null;
+        JsonObject convertedRequest = null;
         try {
             byte[] iv = Base64.getDecoder().decode(request.getIv());
             String user = request.getUser();
             String encryptedMessage = request.getMessage();
             message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+            convertedRequest= new Gson().fromJson(message, JsonObject.class);
+        } catch (Exception e) {
+            System.err.print("ERROR: Invalid key");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+            return;
         }
-
-        JsonObject convertedRequest= new Gson().fromJson(message, JsonObject.class);
-
 
         String requester = convertedRequest.get("userID").getAsString();
         int epoch = convertedRequest.get("Epoch").getAsInt();
@@ -249,6 +248,9 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             if (UsersAt.containsKey(requester)) {
                 coords = UsersAt.get(requester);
             }
+        }else{
+            responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
+            return;
         }
         JsonObject json = new JsonObject();
         json.addProperty("XCoord",coords[0]);
@@ -323,7 +325,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     }
 
     private static void saveReportsToFile() throws IOException {
-        try(BufferedWriter csvWriter = new BufferedWriter(new FileWriter(REPORTS_FILE))){
+        FileWriter fileWriter = new FileWriter(REPORTS_FILE);
+        try(BufferedWriter csvWriter = new BufferedWriter(fileWriter)){
             for (Map.Entry<Integer,HashMap<String,int[]>> entry : reports.entrySet()) {
                 for(Map.Entry<String,int[]> entry1 : entry.getValue().entrySet()){
                     csvWriter.write(entry.getKey() + "," + entry1.getKey() + "," + entry1.getValue()[0] + "," + entry1.getValue()[1]);
@@ -331,8 +334,10 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
                 }
             }
+            fileWriter.flush();
             csvWriter.flush();
             csvWriter.close();
+            fileWriter.close();
         }
     }
 
@@ -372,15 +377,18 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     }
 
     private static void saveKeysToFile() throws IOException {
-
-        try(BufferedWriter csvWriter = new BufferedWriter(new FileWriter(SYMMETRICS_FILE))){
+        FileWriter fileWriter = new FileWriter(SYMMETRICS_FILE);
+        try(BufferedWriter csvWriter = new BufferedWriter(fileWriter)){
             for (Map.Entry<String,SecretKey> entry : userSymmetricKeys.entrySet()) {
                 csvWriter.write(entry.getKey() + ',' + Base64.getEncoder().encodeToString(entry.getValue().getEncoded()));
                 csvWriter.newLine();
             }
+            fileWriter.flush();
+            csvWriter.flush();
             csvWriter.close();
+            fileWriter.close();
         }
-
+        
     }
 
     private static void readKeysFromFile() throws IOException {
@@ -419,7 +427,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             svc_HA.start();
 
             System.out.println("Server started, listening on " + svcPort);
-            System.out.println("Server started, listening on " + svcPort_HA);
+            System.out.println("HA Server started, listening on " + svcPort_HA);
 
 
             svc.awaitTermination();

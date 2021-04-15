@@ -5,4 +5,5 @@
 - Dar drop de mensagem - Done a2
 - Enviar location report com proofers vazios - a1
 - Rejeitar um proofer request de um user - a7
-- Enviar um proofer request com a location alterada - a8se
+- Enviar um proofer request com a location alterada - a8
+- Enviar um obtain location request com o requester id errado (diferente do vdd)

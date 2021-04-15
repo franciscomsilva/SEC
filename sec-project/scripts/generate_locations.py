@@ -1,7 +1,7 @@
 import random
 import csv
 
-users = [1,2,3,4,5]
+users = [1,2,3,4,5,6,7,8,9,10]
 n_epochs = 10
 epoch_counter = 0
 last_epoch = []

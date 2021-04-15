@@ -38,7 +38,6 @@ public class ImageMixer {
         // apply the manipulationFunction to the byte arrays
         byte[] outputBytes = manipulationFunction.mix(image1Bytes, image2Bytes);
 
-
         // convert the output byte array into an image and write it to disk
         BufferedImage outputImage = getImageFromArray(outputBytes, image1.getWidth(), image1.getHeight());
         writeImageToFile(outputImage, outputImageFilePath);
