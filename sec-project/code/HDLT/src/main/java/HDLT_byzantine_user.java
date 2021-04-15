@@ -682,52 +682,53 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                 switch (cmd) {
                     case "Attack1":
                     case "a1":
-                        System.out.println("Sending a empty submition to a server");
+                        System.out.println("ATTACK: Sending a empty submition to a server");
                         SubmitLocationAttack1();
+                        System.out.println("Requesting proofers and sending location report with fake userID");
                         break;
                     case "Attack2":
                     case "a2":
-                        System.out.println("Dropping a proofer request from another user");
+                        System.out.println("ATTACK: Dropping a proofer request from another user");
                         operation_mode = 1;
                         break;
                     case "Attack3":
                     case "a3":
-                        System.out.println("Requesting proofers and sending location report with fake userID");
+                        System.out.println("ATTACK: Requesting proofers and sending location report with fake userID");
                         requestProof(currentEpoch);
                         SubmitLocationDifferentUserID();
                         break;
                     case "Attack4":
                     case "a4":
-                        System.out.println("Requesting proofers and sending location report with fake requester userID");
+                        System.out.println("ATTACK: Requesting proofers and sending location report with fake requester userID");
                         requestProof(currentEpoch);
                         SubmitLocationDifferentUserIDRequester();
                         break;
                     case "Attack 5":
                     case "a5":
-                        System.out.println("Requestion proofers and sending location report with altered digital signature");
+                        System.out.println("ATTACK: Requestion proofers and sending location report with altered digital signature");
                         requestProof(currentEpoch);
                         SubmitLocationWithAlteredDigSig();
                         break;
                     case "Attack 6":
                     case "a6":
-                        System.out.println("Requesting proofers and sending replaying submission");
+                        System.out.println("ATTACK: Requesting proofers and sending replaying submission");
                         requestProof(currentEpoch);
                         SubmitLocation();
                         SubmitLocation();
                         break;
                     case "Attack 7":
                     case "a7":
-                        System.out.println("Rejecting a proofer request from another user");
+                        System.out.println("ATTACK: Rejecting a proofer request from another user");
                         operation_mode = 2;
                         break;
                     case "Attack 8":
                     case "a8":
-                        System.out.println("Sending a proofer request to another user with spoofed location");
+                        System.out.println("ATTACK: Sending a proofer request to another user with spoofed location");
                         operation_mode = 3;
                         break;
                     case "Reset Operation Mode":
                     case "reset":
-                        System.out.println("Resetting operation mode");
+                        System.out.println("INFO: Resetting operation mode");
                         operation_mode = 0;
                         break;
                     case "Epoch":
