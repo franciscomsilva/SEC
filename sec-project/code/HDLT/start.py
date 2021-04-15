@@ -103,7 +103,33 @@ def normal_operation():
 def normal_byzantine_operation():
     compile()   
     init_server_users(byzantine=True)
+     #Reads operations file and executes
+    print("\n")
+    with open(NORMAL_BYZANTINE_OPERATION_FILE) as csv_file:
+        csv_reader =  csv.reader(csv_file, delimiter=',')
+        for row in csv_reader:
+            user_type = str(row[0])
+            epoch = row[1]
+            command = str(row[3])
+            user = int(row[2])
+            if user_type == 'u':
+                p  = user_process_array[user-1]
+
+            elif user_type == 'b':
+                p = byzantine_user_process_array[user - (NUMBER_USERS - NUMBER_BYZANTINE_USERS) -1 ]
+
+            p.stdin.write((str('e ' + epoch) + '\n'))
+            p.stdin.flush()
+            p.stdout.flush()
+
+            p.stdin.write((command + '\n'))
+            p.stdin.flush()
+            p.stdout.flush()
+
     close_server_users(byzantine=True)
+
+
+
 
 def main():
     option = 0

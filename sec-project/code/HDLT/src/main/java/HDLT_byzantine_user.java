@@ -683,35 +683,40 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                     case "Attack1":
                     case "a1":
                         System.out.println("ATTACK: Sending a empty submition to a server");
-                        SubmitLocationAttack1();
-                        System.out.println("Requesting proofers and sending location report with fake userID");
+                        SubmitLocationAttack1();   
+                        System.out.println("INFO: Attack 1 finished!");
                         break;
                     case "Attack2":
                     case "a2":
                         System.out.println("ATTACK: Dropping a proofer request from another user");
+                        System.out.println("INFO: Attack 2 finished!");
                         operation_mode = 1;
                         break;
                     case "Attack3":
                     case "a3":
                         System.out.println("ATTACK: Requesting proofers and sending location report with fake userID");
+                        System.out.println("INFO: Attack 3 finished!");
                         requestProof(currentEpoch);
                         SubmitLocationDifferentUserID();
                         break;
                     case "Attack4":
                     case "a4":
                         System.out.println("ATTACK: Requesting proofers and sending location report with fake requester userID");
+                        System.out.println("INFO: Attack 4 finished!");
                         requestProof(currentEpoch);
                         SubmitLocationDifferentUserIDRequester();
                         break;
                     case "Attack 5":
                     case "a5":
                         System.out.println("ATTACK: Requestion proofers and sending location report with altered digital signature");
+                        System.out.println("INFO: Attack 5 finished!");
                         requestProof(currentEpoch);
                         SubmitLocationWithAlteredDigSig();
                         break;
                     case "Attack 6":
                     case "a6":
                         System.out.println("ATTACK: Requesting proofers and sending replaying submission");
+                        System.out.println("INFO: Attack 6 finished!");
                         requestProof(currentEpoch);
                         SubmitLocation();
                         SubmitLocation();
@@ -719,11 +724,13 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                     case "Attack 7":
                     case "a7":
                         System.out.println("ATTACK: Rejecting a proofer request from another user");
+                        System.out.println("INFO: Attack 7 finished!");
                         operation_mode = 2;
                         break;
                     case "Attack 8":
                     case "a8":
                         System.out.println("ATTACK: Sending a proofer request to another user with spoofed location");
+                        System.out.println("INFO: Attack 8 finished!");
                         operation_mode = 3;
                         break;
                     case "Reset Operation Mode":
