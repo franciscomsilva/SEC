@@ -3,6 +3,6 @@
     - Permite inicar rotina de testes
     - Permite inicar rotina normal
 - Definir codigo com exemplos de ataques no byzantine user - done
-- Definir testes automaticos, com diferentes sequencias de comandos
-- Analisar incluir HMAC no submits
+- Fazer ultimo attack definido no ficheiro
+- Comunicacao entre server e HA_Server encriptada
 - Relatorio
