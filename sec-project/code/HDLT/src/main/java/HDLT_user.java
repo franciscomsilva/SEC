@@ -346,7 +346,7 @@ public class HDLT_user extends UserProtocolImplBase{
 
             svc.start();
 
-            System.out.println("Server started, listening on " + svcPort);
+            System.out.println("User Server started, listening on " + svcPort);
 
         } catch (Exception ex) {
             ex.printStackTrace();

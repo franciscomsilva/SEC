@@ -662,7 +662,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
 
             svc.start();
 
-            System.out.println("Server started, listening on " + svcPort);
+            System.out.println("Byzantine User Server started, listening on " + svcPort);
 
         } catch (Exception ex) {
             ex.printStackTrace();
