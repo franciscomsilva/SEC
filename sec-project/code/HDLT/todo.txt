@@ -5,4 +5,5 @@
 - Definir codigo com exemplos de ataques no byzantine user - done
 - Fazer ultimo attack definido no ficheiro
 - Comunicacao entre server e HA_Server encriptada
+- Fazer README
 - Relatorio
