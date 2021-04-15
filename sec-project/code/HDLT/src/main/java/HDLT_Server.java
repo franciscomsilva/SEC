@@ -201,6 +201,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         }
         else{
             done = false;
+            System.err.println("ERROR: Invalid request");
         }
 
         JsonObject json = new JsonObject();
