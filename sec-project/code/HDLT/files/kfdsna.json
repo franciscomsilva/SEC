@@ -1,0 +1,32 @@
+[
+  {
+    "epoch": "0",
+    "reports": [
+      {
+    "user" : "u1",
+        "coordX" : "1",
+        "coorY" : "2",
+        "proofers" : [
+          {"userId" : "u1",
+            "digSIG" : "kfdnsajigbndfgsnd"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "epoch": "1",
+    "reports": [
+      {
+        "user" : "u1",
+        "coordX" : "1",
+        "coorY" : "2",
+        "proofers" : [
+          {"userId" : "u1",
+            "digSIG" : "kfdnsajigbndfgsnd"
+          }
+        ]
+      }
+    ]
+  }
+]

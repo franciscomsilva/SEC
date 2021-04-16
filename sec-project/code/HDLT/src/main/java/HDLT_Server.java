@@ -1,7 +1,4 @@
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.*;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvValidationException;
@@ -35,14 +32,14 @@ import static java.lang.Integer.parseInt;
 public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
-    private static String REPORTS_FILE = "files/location_reports";
+    private static String REPORTS_FILE = "files/location_reports.json";
     private static String SYMMETRICS_FILE = "files/symmetric_keys";
     private static String USERS_CONNECTION_FILE =  "files/users_connection.txt";
 
     private static Double BYZANTINE_RATIO = 0.5;
     private static int MIN_PROOFERS = 0;
     private static HashMap<String,String> UsersMap = new HashMap<>();
-    private static HashMap<Integer,HashMap<String,int[]>> reports = new HashMap<>();
+    private static JsonArray reports = new JsonArray();
     private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<String, SecretKey>();
 
     public static void readUsers() {
@@ -108,7 +105,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
             convertedRequest= new Gson().fromJson(message, JsonObject.class);
         } catch (Exception e) {
-            System.err.print("ERROR: Invalid key");
+            System.err.println("ERROR: Invalid key");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
             return;
         }
@@ -116,15 +113,32 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         String requester = convertedRequest.get("userID").getAsString();
 
         if(!requester.equals(user)){
-            System.err.print("ERROR: Invalid user");
+            System.err.println("ERROR: Invalid user");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid user"))));
             return;
         }
 
         int epoch = convertedRequest.get("currentEpoch").getAsInt();
 
-        if(reports.containsKey(epoch) && reports.get(epoch).containsKey(user)){
-            System.err.print("ERROR: Invalid request");
+        boolean flagRequest = false;
+        /*RUNS THROUGH THE EPOCH OBJECTS WITH ALL THE REPORTS FOR THAT EPOCH*/
+        for( JsonElement report_epoch : reports){
+            if(report_epoch.getAsJsonObject().get("epoch").equals(epoch))
+            {
+                JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                for(JsonElement jsonElement : reports){
+                    if(jsonElement.getAsJsonObject().get("user").equals(user)){
+                        flagRequest = true;
+                        break;
+                    }
+                }
+                if(!flagRequest)
+                    break;
+            }
+        }
+
+        if(flagRequest){
+            System.err.println("ERROR: Invalid request");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid request"))));
             return;
         }
@@ -147,7 +161,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         Boolean done = false;
         Double flag = 0.0;
 
-        if(!proofers.isEmpty()) {
+        if(!proofers.isEmpty() && proofers.size() >= 3) {
             for (Map.Entry<String, String> entry : proofers.entrySet()) {
 
                 KeyFactory kf = null;
@@ -171,21 +185,41 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             }
                 flag = Double.valueOf(counter)/Double.valueOf(proofers.size());
                 if (flag < BYZANTINE_RATIO) {
-                    if (reports.containsKey(epoch)) {
-                        HashMap<String, int[]> UsersAt = reports.get(epoch);
-                        if (!UsersAt.containsKey(requester)) {
-                            int[] b = {xCoords, yCoords};
-                            UsersAt.put(requester, b);
+
+                    /*CHECK IF JSON OBJECT FOR THAT EPOCH EXISTS*/
+                    JsonObject epoch_object = null;
+                    for( JsonElement report : reports){
+                        if(report.getAsJsonObject().get("epoch").equals(epoch))
+                        {
+                            epoch_object = report.getAsJsonObject().get("epoch").getAsJsonObject();
                         }
-                        reports.replace(epoch, UsersAt);
-
-                    } else {
-                        HashMap<String, int[]> a = new HashMap<>();
-                        int[] b = {xCoords, yCoords};
-                        a.put(requester, b);
-                        reports.put(epoch, a);
                     }
+                    JsonArray reports_array = null;
 
+                    if(epoch_object == null){
+                        epoch_object = new JsonObject();
+                        epoch_object.addProperty("epoch",epoch);
+                        reports_array = new JsonArray();
+                        epoch_object.add("reports",reports_array);
+                    }else{
+                        reports_array = epoch_object.getAsJsonArray("reports");
+                    }
+                    JsonObject reportObject = new JsonObject();
+                    reportObject.addProperty("user",user);
+                    reportObject.addProperty("coordX",xCoords);
+                    reportObject.addProperty("coordY",yCoords);
+                    JsonArray proofers_array = new JsonArray();
+
+                    for(Map.Entry<String,String> entry : proofers.entrySet()){
+                        JsonObject entryObject = new JsonObject();
+                        entryObject.addProperty("userID",entry.getKey());
+                        entryObject.addProperty("digSIG",entry.getValue());
+                        proofers_array.add(entryObject);
+                    }
+                    reportObject.add("proofers",proofers_array);
+                    reports_array.add(reportObject);
+                    epoch_object.add("reports",reports_array);
+                    reports.add(epoch_object);
                     try {
                         saveReportsToFile();
                         System.out.println("INFO: Location report submitted!");
@@ -236,7 +270,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
             convertedRequest= new Gson().fromJson(message, JsonObject.class);
         } catch (Exception e) {
-            System.err.print("ERROR: Invalid key");
+            System.err.println("ERROR: Invalid key");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
             return;
         }
@@ -244,15 +278,28 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         String requester = convertedRequest.get("userID").getAsString();
         int epoch = convertedRequest.get("Epoch").getAsInt();
         int[] coords = {0,0};
-        if(reports.containsKey(epoch)) {
-            HashMap<String, int[]> UsersAt = reports.get(epoch);
-            if (UsersAt.containsKey(requester)) {
-                coords = UsersAt.get(requester);
+
+        boolean flagRequest = true;
+        for( JsonElement report_epoch : reports){
+            if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch))
+            {
+                JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                for(JsonElement jsonElement : reports){
+                    if(jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)){
+                        coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
+                        coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
+                        flagRequest = false;
+                        break;
+                    }
+                }
             }
-        }else{
+        }
+
+        if(flagRequest) {
             responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
             return;
         }
+
         JsonObject json = new JsonObject();
         json.addProperty("XCoord",coords[0]);
         json.addProperty("YCoord",coords[1]);
@@ -284,19 +331,27 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             int epoch = request.getEp();
             int[] coords = {0,0};
 
-            if(reports.containsKey(epoch)) {
-                HashMap<String, int[]> UsersAt = reports.get(epoch);
-                if (UsersAt.containsKey(requester)) {
-                    coords = UsersAt.get(requester);
-                    /*USER NOT IN THAT EPOCH*/
-                }else{
-                    responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: User not in the requested epoch")));
+            boolean flagRequest = true;
+            for( JsonElement report_epoch : reports){
+                if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch))
+                {
+                    JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                    for(JsonElement jsonElement : reports){
+                        if(jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)){
+                            coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
+                            coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
+                            flagRequest = false;
+                            break;
+                        }
+                    }
                 }
             }
-            /*NO REPORTS ON THE REQUESTED EPOCH*/
-            else{
-                responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No reports for the requested epoch")));
+
+            if(flagRequest) {
+                responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
+                return;
             }
+
             hacontract.LocationStatus ls = hacontract.LocationStatus.newBuilder().setXCoord(coords[0]).setYCoord(coords[1]).build();
             responseObserver.onNext(ls);
             responseObserver.onCompleted();
@@ -308,17 +363,26 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             int xCoords = request.getXCoord();
             int yCoords = request.getYCoord();
             List<String> users = new ArrayList<>();
-            if(reports.containsKey(epoch)) {
-                HashMap<String, int[]> UsersAt = reports.get(epoch);
 
-                for(Map.Entry<String, int[]> entry : UsersAt.entrySet()){
-                    String a = entry.getKey();
-                    int[] coords = entry.getValue();
-                    if(coords[0] == xCoords && coords[1] == yCoords){
-                        users.add(a);
+            boolean flagRequest = true;
+            for( JsonElement report_epoch : reports){
+                if(report_epoch.getAsJsonObject().get("epoch").getAsString().equals(epoch))
+                {
+                    JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                    for(JsonElement jsonElement : reports){
+                        if(jsonElement.getAsJsonObject().get("coordX").getAsInt() == (xCoords) && jsonElement.getAsJsonObject().get("coordY").getAsInt() == (yCoords)){
+                            users.add(jsonElement.getAsJsonObject().get("user").getAsString());
+                            flagRequest = false;
+                        }
                     }
                 }
             }
+
+            if(flagRequest) {
+                responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for those coordinates in that epoch!")));
+                return;
+            }
+
             Users u = Users.newBuilder().addAllIds(users).build();
             responseObserver.onNext(u);
             responseObserver.onCompleted();
@@ -327,17 +391,12 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
     private static void saveReportsToFile() throws IOException {
         FileWriter fileWriter = new FileWriter(REPORTS_FILE);
-        try(BufferedWriter csvWriter = new BufferedWriter(fileWriter)){
-            for (Map.Entry<Integer,HashMap<String,int[]>> entry : reports.entrySet()) {
-                for(Map.Entry<String,int[]> entry1 : entry.getValue().entrySet()){
-                    csvWriter.write(entry.getKey() + "," + entry1.getKey() + "," + entry1.getValue()[0] + "," + entry1.getValue()[1]);
-                    csvWriter.newLine();
-
-                }
-            }
+        try{
+            fileWriter.write(reports.toString());
+        }catch (Exception e){
+            System.err.println(e.getStackTrace());
+        }finally {
             fileWriter.flush();
-            csvWriter.flush();
-            csvWriter.close();
             fileWriter.close();
         }
     }
@@ -348,31 +407,11 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             return;
         }
 
-        try(BufferedReader csvReader = new BufferedReader(new FileReader(REPORTS_FILE))){
-            String line;
-            int epoch = 0;
-            int[] coords = {0,0};
-            String user = null;
-            String[] splits = null;
-            HashMap<String,int[]> map = new HashMap<>();
-
-            while((line = csvReader.readLine()) != null){
-                splits = line.split(",");
-                epoch = Integer.parseInt(splits[0]);
-                user = splits[1];
-                coords[0] = Integer.parseInt(splits[2]);
-                coords[1] = Integer.parseInt(splits[3]);
-
-                if(reports.containsKey(epoch)){
-                    map = reports.get(epoch);
-                    map.put(user,coords);
-                    reports.replace(epoch,map);
-                }
-                else{
-                    map.put(user,coords);
-                    reports.put(epoch,map);
-                }
-            }
+        try(BufferedReader bufferedReader = new BufferedReader(new FileReader(REPORTS_FILE))){
+           String line = bufferedReader.readLine();
+           reports = new Gson().fromJson(line,JsonArray.class);
+        }catch(Exception e){
+            System.err.println(e.getMessage());
         }
 
     }

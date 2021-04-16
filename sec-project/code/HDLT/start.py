@@ -4,7 +4,7 @@ import sys,subprocess,csv,pexpect,time,os
 NUMBER_USERS = 10
 NUMBER_BYZANTINE_USERS = 3
 MAVEN_PATH = "../../maven/bin/mvn"
-LOCATION_REPORT_FILE = "files/location_reports"
+LOCATION_REPORT_FILE = "files/location_reports.json"
 
 user_process_array = []
 byzantine_user_process_array = []
@@ -66,7 +66,8 @@ def close_server_users(byzantine = False):
     server.terminate()
 
 def normal_operation():
-    os.remove(LOCATION_REPORT_FILE)
+    if os.path.isfile(LOCATION_REPORT_FILE):
+        os.remove(LOCATION_REPORT_FILE)
     compile()   
     init_server_users()
 
@@ -89,7 +90,7 @@ def normal_operation():
             p.stdout.flush()
             if command == 's':
                 server.expect("INFO: Location report submitted!" or "ERROR: Location report invalid!")
-                print("INFO: Location report for user " + str(user) + " at epoch " + str(epoch) + " submitted!")
+                print(server.after)
             
     #Shows location report file
     print("\n-> Printing the content of `location_reports` file\n")
@@ -104,7 +105,8 @@ def normal_operation():
     close_server_users()
 
 def normal_byzantine_operation():
-    os.remove(LOCATION_REPORT_FILE)
+    if os.path.isfile(LOCATION_REPORT_FILE):
+        os.remove(LOCATION_REPORT_FILE)  
     compile()   
     init_server_users(byzantine=True)
      #Reads operations file and executes
@@ -132,8 +134,7 @@ def normal_byzantine_operation():
                 p.stdout.flush()
                 if command == 's':
                     server.expect("INFO: Location report submitted!" or "ERROR: Location report invalid!")
-                    print("INFO: Location report for user " + str(user) + " at epoch " + str(epoch) + " submitted!")
-                
+                    print(server.after)                
 
             if command[0] == 'a':
                 p.sendline((str('e ' + epoch)))
@@ -154,9 +155,10 @@ def normal_byzantine_operation():
 
 
 def byzantine_operation():
+    if os.path.isfile(LOCATION_REPORT_FILE):
+        os.remove(LOCATION_REPORT_FILE)
     compile()   
     init_server_users(byzantine=True)
-    os.remove(LOCATION_REPORT_FILE)
      #Reads operations file and executes
     print("\n")
     with open(BYZANTINE_OPERATION_FILE) as csv_file:

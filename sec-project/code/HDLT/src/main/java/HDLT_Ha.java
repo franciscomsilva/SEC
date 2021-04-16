@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
@@ -39,15 +40,27 @@ public class HDLT_Ha {
     public static void obtainLocationReport(String user, int epoch) {
 
         GetLocation gl = GetLocation.newBuilder().setEp(epoch).setId(user).build();
-        LocationStatus ls = bStub.obtainLocationReport(gl);
+        LocationStatus ls = null;
+        try{
+            ls = bStub.obtainLocationReport(gl);
+        }catch (Exception e){
+            System.err.println(e.getMessage());
+            return;
+        }
+
         System.out.println("User "+user+" at "+epoch+" are in coordinates ("+ls.getXCoord()+","+ls.getYCoord()+")");
     }
 
     public static void ObtainUsersAtLocation(int epoch, int xCoords, int yCoords) {
 
         UserAtLocation ua = UserAtLocation.newBuilder().setEpoch(epoch).setXCoord(xCoords).setYCoord(yCoords).build();
-
-        List<String> users =  bStub.obtainUsersAtLocation(ua).getIdsList();
+        List<String> users = new ArrayList<>();
+        try{
+            users =  bStub.obtainUsersAtLocation(ua).getIdsList();
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+            return;
+        }
 
         for(String u : users){
             System.out.print(u);
