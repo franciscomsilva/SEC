@@ -47,3 +47,7 @@ Where `byzantine_id` is the number of the byzantine client being launched, plus 
 $ chmod +x launchHA.sh
 $ ./launchHA.sh
 ```
+
+## Project Report
+
+The project report is under the directory `doc`.
