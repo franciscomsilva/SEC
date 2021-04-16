@@ -678,6 +678,17 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+        System.out.println("\nAvailable commands:");
+        System.out.println("- Attack1 (a1): sends an empty submition to a server");
+        System.out.println("- Attack2 (a2): Drops a proofer request from another user");
+        System.out.println("- Attack3 (a3): Requests proofers and sends location report with fake userID");
+        System.out.println("- Attack4 (a4): Requests proofers and sends location report with fake requester userID");
+        System.out.println("- Attack5 (a5): Requets proofers and sends location report with altered digital signature");
+        System.out.println("- Attack6 (a6): Requests proofers and sends replay submission");
+        System.out.println("- Attack7 (a7): Rejects a proofer request from another user");
+        System.out.println("- Attack8 (a8): Sends a proofer request to another user with spoofed location");
+        System.out.println("- Reset Operation Mode (reset): Resets operation mode");
+        System.out.println("- Epoch (e <epoch>) : Sets the user's epoch to the indicated");
 
         //Ler um Script com os requests de cada utilizador
         BufferedReader reader;
@@ -693,7 +704,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                 switch (cmd) {
                     case "Attack1":
                     case "a1":
-                        System.out.println("ATTACK: Sending a empty submition to a server");
+                        System.out.println("ATTACK: Sending an empty submition to a server");
                         SubmitLocationAttack1();   
                         System.out.println("INFO: Attack 1 finished!");
                         break;
@@ -719,7 +730,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                         break;
                     case "Attack 5":
                     case "a5":
-                        System.out.println("ATTACK: Requestion proofers and sending location report with altered digital signature");
+                        System.out.println("ATTACK: Requesting proofers and sending location report with altered digital signature");
                         System.out.println("INFO: Attack 5 finished!");
                         requestProof(currentEpoch);
                         SubmitLocationWithAlteredDigSig();

@@ -170,6 +170,10 @@ public class HDLT_Ha {
         byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
         symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
 
+        System.out.println("\nAvailable commands:");
+        System.out.println("- ObtainLocationReport (o <user> <epoch>): obtains location of indicated user at indicated epoch");
+        System.out.println("- ObtainUsersAtLocation (r <epoch> <xCoord> <yCoord>): obtains users at specified epoch and X and Y coordinates");
+
         try {
             Scanner scanner = new Scanner(System.in);
             int epoch = 0;

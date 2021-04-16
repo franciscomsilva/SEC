@@ -363,6 +363,13 @@ public class HDLT_user extends UserProtocolImplBase{
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+        System.out.println("\nAvailable commands:");
+        System.out.println("- RequestProof (r): requests nearby users to send proof of user location");
+        System.out.println("- SubmitLocation (s): submits location report to the server");
+        System.out.println("- ObtainLocation (o <epoch>): requests from the server the location of the user on the specified epoch");
+        System.out.println("- Sleep <n> : sleeps for n milliseconds");
+        System.out.println("- Epoch (e <epoch>) : Sets the user's epoch to the indicated");
+
 
         //Ler um Script com os requests de cada utilizador
         BufferedReader reader;
