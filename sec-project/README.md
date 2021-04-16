@@ -27,22 +27,22 @@ $ python3 start.py
 
 ### Launch Server
 ```
-$ chmod +x lauchServer.sh
-$ ./lauchServer.sh
+$ chmod +x launchServer.sh
+$ ./launchServer.sh
 ```
 ### Launch Clients
 ```
-$ chmod +x lauchClient.sh
-$ ./lauchClient.sh <client_id>
+$ chmod +x launchClient.sh
+$ ./launchClient.sh <client_id>
 ```
 ### Launch Byzantine Clients
 ```
-$ chmod +x lauchByzantine.sh
-$ ./lauchByzantine.sh <byzantine_id>
+$ chmod +x launchByzantine.sh
+$ ./launchByzantine.sh <byzantine_id>
 ```
 
 ### Launch HA CLient
 ```
-$ chmod +x lauchHA.sh
-$ ./lauchHA.sh
+$ chmod +x launchHA.sh
+$ ./launchHA.sh
 ```
