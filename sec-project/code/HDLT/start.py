@@ -180,39 +180,6 @@ def normal_byzantine_operation():
     close_server_users(byzantine=True)
 
 
-def byzantine_operation():
-    if os.path.isfile(LOCATION_REPORT_FILE):
-        os.remove(LOCATION_REPORT_FILE)
-    compile()   
-    init_server_users(byzantine=True)
-     #Reads operations file and executes
-    print("\n")
-    with open(BYZANTINE_OPERATION_FILE) as csv_file:
-        csv_reader =  csv.reader(csv_file, delimiter=',')
-        for row in csv_reader:
-            epoch = row[1]
-            command = str(row[3])
-            user = int(row[2])
-
-            p = byzantine_user_process_array[user - (NUMBER_USERS - NUMBER_BYZANTINE_USERS) -1 ]
-            
-            if command[0] == 'a':
-                p.sendline((str('e ' + epoch)))
-                p.sendline(command)
-                p.expect("INFO: Attack " + command[1] + " finished!")
-                print("INFO: Attack " + command[1] + " finished!")
-    
-    #Shows location report file
-    print("\n-> Printing the content of `location_reports` file\n")
-    time.sleep(1)
-    f = open(LOCATION_REPORT_FILE, 'r')
-    data = json.load(f)
-    print(json.dumps(data,indent=2))
-    f.close()
-
-
-    close_server_users(byzantine=True)
-    
 
 
 def main():
@@ -220,8 +187,7 @@ def main():
     switcher = {
         '1' : lambda: normal_operation(),
         '2' : lambda: normal_byzantine_operation(),
-        '3' : lambda: byzantine_operation(),
-        '4' : lambda: close_server_users() and exit()
+        '3' : lambda: exit()
     }
 
     while(option != '4'):
@@ -230,8 +196,7 @@ def main():
         print("---------------------------------------------------------------------------------------\n")
         print("1 - Run normal user and server operation (request proof and submit location)")
         print("2 - Run normal user and server operation along with custom and deterministic byzantine user tests")
-        print("3 - Run only custom and deterministic byzantine user tests")
-        print("4 - Exit the tester")
+        print("3 - Exit the tester")
         option = input("\nSelect one of the above options: ")
 
         func = switcher.get(option,lambda: "\nERROR: Wrong option!\n")

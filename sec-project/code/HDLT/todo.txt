@@ -1,9 +1,10 @@
 - Definir script que:
-    - Inicie numero fixo de user (10) e byzantine users (3)
-    - Permite inicar rotina de testes
-    - Permite inicar rotina normal
+    - Inicie numero fixo de user (10) e byzantine users (3) - done
+    - Permite inicar rotina de testes - done
+    - Permite inicar rotina normal - done
 - Definir codigo com exemplos de ataques no byzantine user - done
 - Fazer ultimo attack definido no ficheiro
-- Comunicacao entre server e HA_Server encriptada
-- Fazer README
-- Relatorio
+- Comunicacao entre server e HA_Server encriptada - done
+- Fazer README - done
+- Relatorio - done
+- Incluir ataques a HA e rotina normal HA?
