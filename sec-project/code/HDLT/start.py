@@ -85,12 +85,26 @@ def normal_operation():
             p.stdin.write((str('e ' + epoch) + '\n'))
             p.stdin.flush()
             p.stdout.flush()
-            p.stdin.write((command + '\n'))
+
+            if command == 'o':
+                if len(row) < 4:
+                    exit("ERROR: Wrong syntax in command file")
+                command += " " + str(row[3])
+
+            p.stdin.write(command + '\n')
             p.stdin.flush()
             p.stdout.flush()
+    
+
             if command == 's':
-                server.expect("INFO: Location report submitted!" or "ERROR: Location report invalid!")
+                server.expect(["INFO: Location report submitted!","ERROR: Location report invalid!","ERROR: Invalid request"])
                 print(server.after)
+            if command[0] == 'o':
+                server.expect(["INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
+                print(server.after)
+
+          
+                    
             
     #Shows location report file
     print("\n-> Printing the content of `location_reports` file\n")
@@ -124,16 +138,20 @@ def normal_byzantine_operation():
             elif user_type == 'b':
                 p = byzantine_user_process_array[user - (NUMBER_USERS - NUMBER_BYZANTINE_USERS) -1 ]
 
-            if command == 's' or command == 'r':
+            if command == 's' or command == 'r' or command == 'o':
                 p.stdin.write((str('e ' + epoch) + '\n'))
                 p.stdin.flush()
                 p.stdout.flush()
 
+                if command == 'o':
+                    if len(row) < 4:
+                        exit("ERROR: Wrong syntax in command file")
+                    command += " " + str(row[4])
                 p.stdin.write((command + '\n'))
                 p.stdin.flush()
                 p.stdout.flush()
                 if command == 's':
-                    server.expect("INFO: Location report submitted!" or "ERROR: Location report invalid!")
+                    server.expect(["INFO: Location report submitted!","ERROR: Location report invalid!","ERROR: Invalid request"])
                     print(server.after)                
 
             if command[0] == 'a':
@@ -141,6 +159,10 @@ def normal_byzantine_operation():
                 p.sendline(command)
                 p.expect("INFO: Attack " + command[1] + " finished!")
                 print("INFO: Attack " + command[1] + " finished!")
+
+            if command[0] == 'o':
+                server.expect(["INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
+                print(server.after)
    
     #Shows location report file
     print("\n-> Printing the content of `location_reports` file\n")

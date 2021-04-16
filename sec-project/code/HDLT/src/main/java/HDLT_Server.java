@@ -297,6 +297,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
         if(flagRequest) {
             responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
+            System.err.println("ERROR: No location report for that user in that epoch!");
             return;
         }
 
@@ -319,6 +320,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         }
         LocationStatus ls = LocationStatus.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
                 .encodeToString(iv.getIV())).build();
+
+        System.out.println("INFO: Sent location report for " + requester +  " at epoch " + epoch);
         responseObserver.onNext(ls);
         responseObserver.onCompleted();
     }
