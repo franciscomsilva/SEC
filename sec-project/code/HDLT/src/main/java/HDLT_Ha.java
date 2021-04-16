@@ -8,6 +8,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import userserver.UserServerGrpc;
 //import userserver.UserServerGrpc;
 
 import javax.crypto.SecretKey;
@@ -158,9 +159,14 @@ public class HDLT_Ha {
         bStub = HAProtocolGrpc.newBlockingStub(channel);
 
         hacontract.InitMessage initMessage = hacontract.InitMessage.newBuilder().setUser(user).build();
-        hacontract.Key responseKey = bStub.init(initMessage);
+        hacontract.Key responseKey = null;
+        try{
+            responseKey = bStub.init(initMessage);
+        }catch(Exception e){
+            System.err.println("ERROR: Server connection failed!");
+            return;
+        }
         String base64SymmetricKey = responseKey.getKey();
-
         byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
         symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
 

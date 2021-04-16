@@ -330,9 +330,14 @@ public class HDLT_user extends UserProtocolImplBase{
                 .build();
         bStub = UserServerGrpc.newBlockingStub(channel);
         InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
-        Key responseKey = bStub.init(initMessage);
+        Key responseKey = null;
+        try{
+            responseKey = bStub.init(initMessage);
+        }catch(Exception e){
+            System.err.println("ERROR: Server connection failed!");
+            return;
+        }
         String base64SymmetricKey = responseKey.getKey();
-
         byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
         symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
 
