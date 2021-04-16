@@ -18,19 +18,19 @@ message InitMessage {
 message Key {
     string key = 1;
 }
-
 message GetLocation {
     string message = 1;
+    string iv = 2;
 }
 message LocationStatus {
     string message = 1;
+    string iv = 2;
 }
 message UserAtLocation {
     string message = 1;
+    string iv = 2;
 }
-
 message Users {
     string message = 1;
+    string iv = 2;
 }
-
-

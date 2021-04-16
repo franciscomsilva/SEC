@@ -325,19 +325,33 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
 
     public static class HA_Server extends HAProtocolGrpc.HAProtocolImplBase {
+
         @Override
         public void obtainLocationReport(hacontract.GetLocation request, StreamObserver<hacontract.LocationStatus> responseObserver) {
-            String requester = request.getId();
-            int epoch = request.getEp();
-            int[] coords = {0,0};
+            //Decoding
+            String message = null;
+            JsonObject convertedRequest = null;
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                String user = "user_ha";
+                String encryptedMessage = request.getMessage();
+                message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
+                convertedRequest= new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+            String requester = convertedRequest.get("user").getAsString();
+            int epoch = convertedRequest.get("epoch").getAsInt();
+            int[] coords = {0, 0};
 
             boolean flagRequest = true;
-            for( JsonElement report_epoch : reports){
-                if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch))
-                {
+            for (JsonElement report_epoch : reports) {
+                if (report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch)) {
                     JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
-                    for(JsonElement jsonElement : reports){
-                        if(jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)){
+                    for (JsonElement jsonElement : reports) {
+                        if (jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)) {
                             coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
                             coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
                             flagRequest = false;
@@ -347,30 +361,60 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 }
             }
 
-            if(flagRequest) {
+            if (flagRequest) {
                 responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
                 return;
             }
+            //Encriptação
+            String resp = null;
+            IvParameterSpec iv = null;
+            JsonObject coords_object = new JsonObject();
+            coords_object.addProperty("xCoords",coords[0]);
+            coords_object.addProperty("yCoords",coords[1]);
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),coords_object.toString(),iv);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
-            hacontract.LocationStatus ls = hacontract.LocationStatus.newBuilder().setXCoord(coords[0]).setYCoord(coords[1]).build();
+
+            hacontract.LocationStatus ls = hacontract.LocationStatus.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).build();
             responseObserver.onNext(ls);
             responseObserver.onCompleted();
         }
 
         @Override
         public void obtainUsersAtLocation(UserAtLocation request, StreamObserver<Users> responseObserver) {
-            int epoch = request.getEpoch();
-            int xCoords = request.getXCoord();
-            int yCoords = request.getYCoord();
+            //Decoding
+            String message = null;
+            JsonObject convertedRequest = null;
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                String user = "user_ha";
+                String encryptedMessage = request.getMessage();
+                message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
+                convertedRequest= new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+            int epoch = convertedRequest.get("epoch").getAsInt();
+            int xCoords = convertedRequest.get("xCoords").getAsInt();
+            int yCoords = convertedRequest.get("yCoords").getAsInt();
+
             List<String> users = new ArrayList<>();
 
             boolean flagRequest = true;
-            for( JsonElement report_epoch : reports){
-                if(report_epoch.getAsJsonObject().get("epoch").getAsString().equals(epoch))
-                {
+            for (JsonElement report_epoch : reports) {
+                if (report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch)) {
                     JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
-                    for(JsonElement jsonElement : reports){
-                        if(jsonElement.getAsJsonObject().get("coordX").getAsInt() == (xCoords) && jsonElement.getAsJsonObject().get("coordY").getAsInt() == (yCoords)){
+                    for (JsonElement jsonElement : reports) {
+                        if (jsonElement.getAsJsonObject().get("coordX").getAsInt() == (xCoords) && jsonElement.getAsJsonObject().get("coordY").getAsInt() == (yCoords)) {
                             users.add(jsonElement.getAsJsonObject().get("user").getAsString());
                             flagRequest = false;
                         }
@@ -378,14 +422,65 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 }
             }
 
-            if(flagRequest) {
+            if (flagRequest) {
                 responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for those coordinates in that epoch!")));
                 return;
             }
+             StringBuilder sb = new StringBuilder();
+            for(String user : users){
+                sb.append(user + ";");
+            }
 
-            Users u = Users.newBuilder().addAllIds(users).build();
+            //Encriptação
+            String resp = null;
+            IvParameterSpec iv = null;
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),sb.toString(),iv);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            Users u = Users.newBuilder().setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).setMessage(resp).build();
             responseObserver.onNext(u);
             responseObserver.onCompleted();
+        }
+
+        @Override
+        public void init(hacontract.InitMessage request, StreamObserver<hacontract.Key> responseObserver) {
+            String user = request.getUser();
+            SecretKey secretKey = null;
+            try {
+                secretKey = AESKeyGenerator.write();
+                userSymmetricKeys.put(user,secretKey);
+                saveKeysToFile();
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            PublicKey pubKey = null;
+            try {
+                pubKey = Utils.readPub("keys/"+user);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                String encryptedKey = Utils.encryptSymmetricKey(pubKey,secretKey);
+                hacontract.Key symmetricKeyResponse = hacontract.Key.newBuilder().setKey(encryptedKey).build();
+                responseObserver.onNext(symmetricKeyResponse);
+                responseObserver.onCompleted();
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 

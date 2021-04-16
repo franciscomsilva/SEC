@@ -1,4 +1,6 @@
 import Utils.Utils;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import hacontract.*;
@@ -23,12 +25,14 @@ public class HDLT_Ha {
 
     static HAProtocolGrpc.HAProtocolBlockingStub bStub;//TODO Mudar o tipo de stub consoante o contracto
 
-    private static String SYMMETRICS_FILE_HA = "files/symmetric_keys_ha";
-    private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<String, SecretKey>();
+    private static String user;
+
+    private static SecretKey symmetricKey;
+
 
 
     public static void readUsers() {
-        try (CSVReader reader = new CSVReader(new FileReader("users_connection.txt"))) {
+        try (CSVReader reader = new CSVReader(new FileReader("files/users_connection.txt"))) {
             String[] lineInArray;
             while ((lineInArray = reader.readNext()) != null) {
                 UsersMap.put(lineInArray[0],lineInArray[1]);
@@ -44,11 +48,61 @@ public class HDLT_Ha {
 
     public static void obtainLocationReport(String user, int epoch) {
 
-        // Encriptação
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("epoch", epoch);
+        jsonObject.addProperty("user", user);
 
+
+        // Encriptação
         String encryptedMessage = null;
         IvParameterSpec ivSpec = null;
-        userserver.LocationStatus resp = null;
+        hacontract.LocationStatus ls = null;
+        try {
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,jsonObject.toString(),ivSpec);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        hacontract.GetLocation gl = hacontract.GetLocation.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).build();
+        try{
+            ls = bStub.obtainLocationReport(gl);
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+            return;
+        }
+        // Desencriptar
+        encryptedMessage = ls.getMessage();
+        byte[] iv =Base64.getDecoder().decode(ls.getIv());
+        String decryptedMessage = null;
+        try {
+            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+
+        System.out.println("User "+user+" at "+epoch+" are in coordinates ("+convertedResponse.get("xCoords").getAsInt()+","+convertedResponse.get("yCoords").getAsInt()+")");
+
+    }
+
+    public static void ObtainUsersAtLocation(int epoch, int xCoords, int yCoords) {
+
+        JsonObject json =  new JsonObject();
+        json.addProperty("epoch", epoch);
+        json.addProperty("xCoords", xCoords);
+        json.addProperty("yCoords", yCoords);
+
+        // Encriptação
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
+        hacontract.LocationStatus ls = null;
         try {
             ivSpec = Utils.generateIv();
             encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
@@ -58,58 +112,57 @@ public class HDLT_Ha {
             e.printStackTrace();
         }
 
-        userserver.GetLocation gl = userserver.GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
-                .encodeToString(ivSpec.getIV())).build();
+        UserAtLocation ua = UserAtLocation.newBuilder().setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).setMessage(encryptedMessage).build();
+
+        Users users;
         try{
-            resp = bStub.obtainLocationReport(gl);
+            users =  bStub.obtainUsersAtLocation(ua);
         }catch(Exception e){
             System.err.println(e.getMessage());
             return;
         }
 
-
-        GetLocation gl = GetLocation.newBuilder().setEp(epoch).setId(user).build();
-        LocationStatus ls = null;
-        try{
-            ls = bStub.obtainLocationReport(gl);
-        }catch (Exception e){
-            System.err.println(e.getMessage());
-            return;
+        // Desencriptar
+        encryptedMessage = users.getMessage();
+        byte[] iv =Base64.getDecoder().decode(users.getIv());
+        String decryptedMessage = null;
+        try {
+            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+        String[] splits = decryptedMessage.split(";");
 
-        System.out.println("User "+user+" at "+epoch+" are in coordinates ("+ls.getXCoord()+","+ls.getYCoord()+")");
-    }
-
-    public static void ObtainUsersAtLocation(int epoch, int xCoords, int yCoords) {
-
-        UserAtLocation ua = UserAtLocation.newBuilder().setEpoch(epoch).setXCoord(xCoords).setYCoord(yCoords).build();
-        List<String> users = new ArrayList<>();
-        try{
-            users =  bStub.obtainUsersAtLocation(ua).getIdsList();
-        }catch(Exception e){
-            System.err.println(e.getMessage());
-            return;
-        }
-
-        for(String u : users){
-            System.out.print(u);
+        for(String u : splits){
+            System.out.println("USER: " + u);
         }
         System.out.println("");
     }
 
 
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws GeneralSecurityException, IOException {
         readUsers();
 
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
+        user = "user_ha";
         String svcIP = phrase.split(":")[0];
         int sPort = Integer.parseInt(phrase.split(":")[1] )+ 50;
         ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
                 .usePlaintext()
                 .build();
         bStub = HAProtocolGrpc.newBlockingStub(channel);
+
+        hacontract.InitMessage initMessage = hacontract.InitMessage.newBuilder().setUser(user).build();
+        hacontract.Key responseKey = bStub.init(initMessage);
+        String base64SymmetricKey = responseKey.getKey();
+
+        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
+        symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
 
         try {
             Scanner scanner = new Scanner(System.in);
