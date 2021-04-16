@@ -1,4 +1,4 @@
-import sys,subprocess,csv,pexpect,time,os
+import sys,subprocess,csv,pexpect,time,os,json
 
 
 NUMBER_USERS = 10
@@ -112,7 +112,8 @@ def normal_operation():
     print("\n-> Printing the content of `location_reports` file\n")
     time.sleep(1)
     f = open(LOCATION_REPORT_FILE, 'r')
-    print(f.read())
+    data = json.load(f)
+    print(json.dumps(data,indent=2))
     f.close()
 
 
@@ -166,11 +167,12 @@ def normal_byzantine_operation():
                 server.expect(["INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
                 print(server.after)
    
-    #Shows location report file
+   #Shows location report file
     print("\n-> Printing the content of `location_reports` file\n")
     time.sleep(1)
     f = open(LOCATION_REPORT_FILE, 'r')
-    print(f.read())
+    data = json.load(f)
+    print(json.dumps(data,indent=2))
     f.close()
 
 
@@ -199,11 +201,13 @@ def byzantine_operation():
                 p.sendline(command)
                 p.expect("INFO: Attack " + command[1] + " finished!")
                 print("INFO: Attack " + command[1] + " finished!")
+    
     #Shows location report file
     print("\n-> Printing the content of `location_reports` file\n")
     time.sleep(1)
     f = open(LOCATION_REPORT_FILE, 'r')
-    print(f.read())
+    data = json.load(f)
+    print(json.dumps(data,indent=2))
     f.close()
 
 
