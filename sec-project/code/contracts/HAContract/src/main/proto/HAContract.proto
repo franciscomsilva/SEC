@@ -9,6 +9,14 @@ package hacontract; // package do proto
 service HAProtocol {
     rpc obtainLocationReport (GetLocation) returns (LocationStatus);
     rpc obtainUsersAtLocation (UserAtLocation) returns (Users);
+    rpc init (InitMessage) returns (Key);
+}
+
+message InitMessage {
+    string user = 1;
+}
+message Key {
+    string key = 1;
 }
 
 message GetLocation {

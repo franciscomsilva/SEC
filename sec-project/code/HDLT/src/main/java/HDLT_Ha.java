@@ -1,3 +1,4 @@
+import Utils.Utils;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import hacontract.*;
@@ -7,20 +8,24 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 //import userserver.UserServerGrpc;
 
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Scanner;
+import java.security.GeneralSecurityException;
+import java.util.*;
 
 public class HDLT_Ha {
 
     static HashMap<String,String> UsersMap = new HashMap<>();
 
     static HAProtocolGrpc.HAProtocolBlockingStub bStub;//TODO Mudar o tipo de stub consoante o contracto
+
+    private static String SYMMETRICS_FILE_HA = "files/symmetric_keys_ha";
+    private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<String, SecretKey>();
+
 
     public static void readUsers() {
         try (CSVReader reader = new CSVReader(new FileReader("users_connection.txt"))) {
@@ -38,6 +43,30 @@ public class HDLT_Ha {
     }
 
     public static void obtainLocationReport(String user, int epoch) {
+
+        // Encriptação
+
+        String encryptedMessage = null;
+        IvParameterSpec ivSpec = null;
+        userserver.LocationStatus resp = null;
+        try {
+            ivSpec = Utils.generateIv();
+            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        userserver.GetLocation gl = userserver.GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
+                .encodeToString(ivSpec.getIV())).build();
+        try{
+            resp = bStub.obtainLocationReport(gl);
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+            return;
+        }
+
 
         GetLocation gl = GetLocation.newBuilder().setEp(epoch).setId(user).build();
         LocationStatus ls = null;
