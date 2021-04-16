@@ -105,7 +105,7 @@ public class HDLT_user extends UserProtocolImplBase{
             int x1 = Integer.parseInt(line[2]);
             int y1 = Integer.parseInt(line[3]);
             double v = Math.sqrt(Math.pow((double)Math.abs(x1-x),2) + Math.pow((double)Math.abs(y1-y),2));
-            if(v < 2.0){
+            if(v <= 2.0){
                 double [] a = {v,x1,y1};
                 RadiusUsers.put(line[0],a);
             }
