@@ -185,13 +185,13 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             }
                 flag = Double.valueOf(counter)/Double.valueOf(proofers.size());
                 if (flag < BYZANTINE_RATIO) {
-
+                    boolean flagEpoch = false;
                     /*CHECK IF JSON OBJECT FOR THAT EPOCH EXISTS*/
                     JsonObject epoch_object = null;
                     for( JsonElement report : reports){
-                        if(report.getAsJsonObject().get("epoch").equals(epoch))
+                        if(report.getAsJsonObject().get("epoch").getAsInt() == epoch)
                         {
-                            epoch_object = report.getAsJsonObject().get("epoch").getAsJsonObject();
+                            epoch_object = report.getAsJsonObject();
                         }
                     }
                     JsonArray reports_array = null;
@@ -200,7 +200,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                         epoch_object = new JsonObject();
                         epoch_object.addProperty("epoch",epoch);
                         reports_array = new JsonArray();
-                        epoch_object.add("reports",reports_array);
+                        flagEpoch = true;
                     }else{
                         reports_array = epoch_object.getAsJsonArray("reports");
                     }
@@ -219,7 +219,10 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     reportObject.add("proofers",proofers_array);
                     reports_array.add(reportObject);
                     epoch_object.add("reports",reports_array);
-                    reports.add(epoch_object);
+                    if(flagEpoch)
+                        reports.add(epoch_object);
+
+
                     try {
                         saveReportsToFile();
                         System.out.println("INFO: Location report submitted!");

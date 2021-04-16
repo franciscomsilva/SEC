@@ -139,8 +139,8 @@ public class HDLT_user extends UserProtocolImplBase{
                     }
                 };
                 executorService.execute(run);
-                Thread.sleep(500);
-                if(executorService.awaitTermination(500, TimeUnit.MILLISECONDS)){
+                Thread.sleep(100);
+                if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
                     executorService.shutdownNow();
                 }
             }

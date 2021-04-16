@@ -61,6 +61,8 @@ def close_server_users(byzantine = False):
     if byzantine==True:
         for i in byzantine_user_process_array:\
             i.terminate()
+    user_process_array.clear()
+    byzantine_user_process_array.clear()
 
     global server
     server.terminate()
