@@ -35,12 +35,13 @@ $ ./launchServer.sh
 $ chmod +x launchClient.sh
 $ ./launchClient.sh <client_id>
 ```
+Where `client_id` is the number of the client being launched (1, 2, 3, ...)
 ### Launch Byzantine Clients
 ```
 $ chmod +x launchByzantine.sh
 $ ./launchByzantine.sh <byzantine_id>
 ```
-
+Where `byzantine_id` is the number of the byzantine client being launched, plus the number of correct clients launched before (4, 5, ...)
 ### Launch HA CLient
 ```
 $ chmod +x launchHA.sh

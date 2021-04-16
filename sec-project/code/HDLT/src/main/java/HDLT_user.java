@@ -316,6 +316,13 @@ public class HDLT_user extends UserProtocolImplBase{
 
         //Ler ficheiro com os endereços dos utilizadores
         readUsers();
+
+        //CHECK SIZE OF ARGUMENTS
+        if(args.length < 1){
+            System.err.println("ERROR:Wrong number of arguments");
+            return;
+        }
+
         //Obter o próprio Utilizador bem como o port
         user = args[0];
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);

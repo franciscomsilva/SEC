@@ -630,6 +630,13 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
 
         //Ler ficheiro com os endereços dos utilizadores
         readUsers();
+
+        //CHECK SIZE OF ARGUMENTS
+        if(args.length < 1){
+            System.err.println("ERROR:Wrong number of arguments");
+            return;
+        }
+
         //READ COMMAND LINE ARGUMENTS
         user = args[0];
 
@@ -646,12 +653,16 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                 .build();
         bStub = UserServerGrpc.newBlockingStub(channel);
         InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
-        Key responseKey = bStub.init(initMessage);
+        Key responseKey = null;
+        try{
+            responseKey = bStub.init(initMessage);
+        }catch(Exception e){
+            System.err.println("ERROR: Server connection failed!");
+            return;
+        }
         String base64SymmetricKey = responseKey.getKey();
-
         byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
         symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
-
         //Instancia de Servidor para os Clients
         Server svc = null;
         try {
