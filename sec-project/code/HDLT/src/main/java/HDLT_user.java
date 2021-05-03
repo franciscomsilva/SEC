@@ -11,15 +11,12 @@ import userprotocol.UserProtocolGrpc.UserProtocolImplBase;
 import userserver.*;
 
 
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -41,6 +38,7 @@ public class HDLT_user extends UserProtocolImplBase{
     private static UserServerGrpc.UserServerBlockingStub bStub;
     private static String USERS_CONNECTION_FILE = "files/users_connection.txt";
     private static String MAP_GRID_FILE = "files/map_grid.txt";
+    private static int NUMBER_SERVERS = 3;
 
 
     private static HashMap<String,String> UsersMap = new HashMap<>();
@@ -230,18 +228,22 @@ public class HDLT_user extends UserProtocolImplBase{
             e.printStackTrace();
         }
 
+
         LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
                 .encodeToString(ivSpec.getIV())).setUser(user).build();
         LocationResponse resp = null;
 
         try{
-             resp = bStub.submitLocationReport(lr);
+            for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+                changeServer(i);
+                resp = bStub.submitLocationReport(lr);
+            }
         }catch(Exception e){
             System.err.println(e.getMessage());
             return;
         }
 
-        // Desencriptar
+        // Desencriptar - TODO PARA MULTIPLOS SERVERS
         encryptedMessage = resp.getMessage();
         byte[] iv =Base64.getDecoder().decode(resp.getIv());
         String decryptedMessage = null;
@@ -287,7 +289,10 @@ public class HDLT_user extends UserProtocolImplBase{
         GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
                 .encodeToString(ivSpec.getIV())).build();
         try{
-            resp = bStub.obtainLocationReport(gl);
+            for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+                changeServer(i);
+                resp = bStub.obtainLocationReport(gl);
+            }
         }catch(Exception e){
             System.err.println(e.getMessage());
             return;
@@ -312,6 +317,19 @@ public class HDLT_user extends UserProtocolImplBase{
 
     }
 
+    private static void changeServer(int n_server){
+        //Conexão com o servidor
+        String phrase = UsersMap.get("server");
+        String svcIP = phrase.split(":")[0];
+        int sPort = Integer.parseInt(phrase.split(":")[1]) + n_server;
+
+        ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
+                .usePlaintext()
+                .build();
+        bStub = UserServerGrpc.newBlockingStub(channel);
+    }
+
+
     public static void main(String[] args) throws GeneralSecurityException, IOException {
 
         //Ler ficheiro com os endereços dos utilizadores
@@ -327,19 +345,15 @@ public class HDLT_user extends UserProtocolImplBase{
         user = args[0];
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
-        //Conexão com o servidor
-        String phrase = UsersMap.get("server");
-        String svcIP = phrase.split(":")[0];
-        int sPort = Integer.parseInt(phrase.split(":")[1]);
+        /*Connects with server 1*/
+        changeServer(1);
 
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
-                .usePlaintext()
-                .build();
-        bStub = UserServerGrpc.newBlockingStub(channel);
+        /*READS KEYSTORE*/
+
         InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
         Key responseKey = null;
         try{
-            responseKey = bStub.init(initMessage);
+            responseKey = bStub.init(initMessage); //TODO MULTIPLO SERVERS
         }catch(Exception e){
             System.err.println("ERROR: Server connection failed!");
             return;

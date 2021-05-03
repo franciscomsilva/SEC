@@ -455,14 +455,14 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             responseObserver.onCompleted();
         }
 
-        @Override
+        @Override //TODO MULTIPLO SERVERS
         public void init(hacontract.InitMessage request, StreamObserver<hacontract.Key> responseObserver) {
             String user = request.getUser();
             SecretKey secretKey = null;
             try {
                 secretKey = AESKeyGenerator.write();
                 userSymmetricKeys.put(user,secretKey);
-                saveKeysToFile();
+                //saveKeysToFile();
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -547,12 +547,13 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
     public static void main(String[] args) throws IOException {
         readUsers();
-        int svcPort = Integer.parseInt(UsersMap.get("server").split(":")[1]);
-        int svcPort_HA = svcPort + 50;
+        int n_server = Integer.parseInt(args[0]);
+        int svcPort = Integer.parseInt(UsersMap.get("server").split(":")[1]) + n_server;
+        int svcPort_HA = svcPort + 50 + n_server;
         Server svc = null;
         Server svc_HA = null;
 
-        readKeysFromFile();
+        //readKeysFromFile();
         readReportsFromFile();
 
         try {
