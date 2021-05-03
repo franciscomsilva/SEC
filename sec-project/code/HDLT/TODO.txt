@@ -1,0 +1,21 @@
+Old TODO:
+- hmac ou assinatura digital - DONE
+- chave simetrica (timeout para gerar nova chave) - DONE
+- server crash (gerar nova chave; não guardar chaves) - DONE (ACHO EU)
+- usar keystores
+- questao dos bizantinos no relatorio
+- são precisos f proofs para o servidor aceitar
+- garantir freshness nas mensagens (nounces, counters) ???
+
+
+New TODO:
+- dupla chamada aos servidores, no caso de exceções RESOURCE_EXHAUSTED e NOT_FOUND
+
+
+Stage 2:
+- step 1 - DONE
+- step 2
+- step 3
+- step 4
+- step 5
+

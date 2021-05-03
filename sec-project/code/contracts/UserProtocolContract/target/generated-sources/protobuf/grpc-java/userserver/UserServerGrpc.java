@@ -123,6 +123,38 @@ public final class UserServerGrpc {
      return getObtainLocationReportMethod;
   }
 
+  private static volatile io.grpc.MethodDescriptor<userserver.GetProofs,
+      userserver.ProofsResponse> getRequestMyProofsMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "requestMyProofs",
+      requestType = userserver.GetProofs.class,
+      responseType = userserver.ProofsResponse.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<userserver.GetProofs,
+      userserver.ProofsResponse> getRequestMyProofsMethod() {
+    io.grpc.MethodDescriptor<userserver.GetProofs, userserver.ProofsResponse> getRequestMyProofsMethod;
+    if ((getRequestMyProofsMethod = UserServerGrpc.getRequestMyProofsMethod) == null) {
+      synchronized (UserServerGrpc.class) {
+        if ((getRequestMyProofsMethod = UserServerGrpc.getRequestMyProofsMethod) == null) {
+          UserServerGrpc.getRequestMyProofsMethod = getRequestMyProofsMethod = 
+              io.grpc.MethodDescriptor.<userserver.GetProofs, userserver.ProofsResponse>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(
+                  "userserver.UserServer", "requestMyProofs"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  userserver.GetProofs.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  userserver.ProofsResponse.getDefaultInstance()))
+                  .setSchemaDescriptor(new UserServerMethodDescriptorSupplier("requestMyProofs"))
+                  .build();
+          }
+        }
+     }
+     return getRequestMyProofsMethod;
+  }
+
   /**
    * Creates a new async stub that supports all call types for the service
    */
@@ -171,6 +203,13 @@ public final class UserServerGrpc {
       asyncUnimplementedUnaryCall(getObtainLocationReportMethod(), responseObserver);
     }
 
+    /**
+     */
+    public void requestMyProofs(userserver.GetProofs request,
+        io.grpc.stub.StreamObserver<userserver.ProofsResponse> responseObserver) {
+      asyncUnimplementedUnaryCall(getRequestMyProofsMethod(), responseObserver);
+    }
+
     @java.lang.Override public final io.grpc.ServerServiceDefinition bindService() {
       return io.grpc.ServerServiceDefinition.builder(getServiceDescriptor())
           .addMethod(
@@ -194,6 +233,13 @@ public final class UserServerGrpc {
                 userserver.GetLocation,
                 userserver.LocationStatus>(
                   this, METHODID_OBTAIN_LOCATION_REPORT)))
+          .addMethod(
+            getRequestMyProofsMethod(),
+            asyncUnaryCall(
+              new MethodHandlers<
+                userserver.GetProofs,
+                userserver.ProofsResponse>(
+                  this, METHODID_REQUEST_MY_PROOFS)))
           .build();
     }
   }
@@ -239,6 +285,14 @@ public final class UserServerGrpc {
       asyncUnaryCall(
           getChannel().newCall(getObtainLocationReportMethod(), getCallOptions()), request, responseObserver);
     }
+
+    /**
+     */
+    public void requestMyProofs(userserver.GetProofs request,
+        io.grpc.stub.StreamObserver<userserver.ProofsResponse> responseObserver) {
+      asyncUnaryCall(
+          getChannel().newCall(getRequestMyProofsMethod(), getCallOptions()), request, responseObserver);
+    }
   }
 
   /**
@@ -278,6 +332,13 @@ public final class UserServerGrpc {
     public userserver.LocationStatus obtainLocationReport(userserver.GetLocation request) {
       return blockingUnaryCall(
           getChannel(), getObtainLocationReportMethod(), getCallOptions(), request);
+    }
+
+    /**
+     */
+    public userserver.ProofsResponse requestMyProofs(userserver.GetProofs request) {
+      return blockingUnaryCall(
+          getChannel(), getRequestMyProofsMethod(), getCallOptions(), request);
     }
   }
 
@@ -322,11 +383,20 @@ public final class UserServerGrpc {
       return futureUnaryCall(
           getChannel().newCall(getObtainLocationReportMethod(), getCallOptions()), request);
     }
+
+    /**
+     */
+    public com.google.common.util.concurrent.ListenableFuture<userserver.ProofsResponse> requestMyProofs(
+        userserver.GetProofs request) {
+      return futureUnaryCall(
+          getChannel().newCall(getRequestMyProofsMethod(), getCallOptions()), request);
+    }
   }
 
   private static final int METHODID_INIT = 0;
   private static final int METHODID_SUBMIT_LOCATION_REPORT = 1;
   private static final int METHODID_OBTAIN_LOCATION_REPORT = 2;
+  private static final int METHODID_REQUEST_MY_PROOFS = 3;
 
   private static final class MethodHandlers<Req, Resp> implements
       io.grpc.stub.ServerCalls.UnaryMethod<Req, Resp>,
@@ -356,6 +426,10 @@ public final class UserServerGrpc {
         case METHODID_OBTAIN_LOCATION_REPORT:
           serviceImpl.obtainLocationReport((userserver.GetLocation) request,
               (io.grpc.stub.StreamObserver<userserver.LocationStatus>) responseObserver);
+          break;
+        case METHODID_REQUEST_MY_PROOFS:
+          serviceImpl.requestMyProofs((userserver.GetProofs) request,
+              (io.grpc.stub.StreamObserver<userserver.ProofsResponse>) responseObserver);
           break;
         default:
           throw new AssertionError();
@@ -421,6 +495,7 @@ public final class UserServerGrpc {
               .addMethod(getInitMethod())
               .addMethod(getSubmitLocationReportMethod())
               .addMethod(getObtainLocationReportMethod())
+              .addMethod(getRequestMyProofsMethod())
               .build();
         }
       }

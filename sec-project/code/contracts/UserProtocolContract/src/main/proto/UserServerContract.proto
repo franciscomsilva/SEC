@@ -10,6 +10,7 @@ service UserServer {
     rpc init (InitMessage) returns (Key);
     rpc submitLocationReport (LocationReport) returns (LocationResponse);
     rpc obtainLocationReport (GetLocation) returns (LocationStatus);
+    rpc requestMyProofs (GetProofs) returns (ProofsResponse);
 }
 
 message InitMessage {
@@ -18,23 +19,36 @@ message InitMessage {
 message Key {
     string key = 1;
 }
-
 message LocationReport {
     string user = 1;
     string message = 2;
     string iv = 3;
+    string digSig = 4;
 }
 message LocationResponse {
     string message = 1;
     string iv = 2;
+    string digSig = 3;
 }
-
 message GetLocation {
     string user = 1;
     string message = 2;
     string iv = 3;
+    string digSig = 4;
 }
 message LocationStatus {
     string message = 1;
     string iv = 2;
+    string digSig = 3;
+}
+message GetProofs {
+    string user = 1;
+    string message = 2;
+    string iv = 3;
+    string digSig = 4;
+}
+message ProofsResponse {
+    string message = 1;
+    string iv = 2;
+    string digSig = 3;
 }

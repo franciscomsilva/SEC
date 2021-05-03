@@ -36,4 +36,14 @@ public interface LocationReportOrBuilder extends
    */
   com.google.protobuf.ByteString
       getIvBytes();
+
+  /**
+   * <code>string digSig = 4;</code>
+   */
+  java.lang.String getDigSig();
+  /**
+   * <code>string digSig = 4;</code>
+   */
+  com.google.protobuf.ByteString
+      getDigSigBytes();
 }

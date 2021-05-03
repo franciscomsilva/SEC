@@ -15,6 +15,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 
 import java.util.*;
@@ -26,6 +27,9 @@ import java.util.concurrent.TimeUnit;
 import Utils.Utils;
 import userserver.Key;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 
@@ -38,14 +42,14 @@ public class HDLT_user extends UserProtocolImplBase{
     private static UserServerGrpc.UserServerBlockingStub bStub;
     private static String USERS_CONNECTION_FILE = "files/users_connection.txt";
     private static String MAP_GRID_FILE = "files/map_grid.txt";
-    private static int NUMBER_SERVERS = 3;
+    private static int NUMBER_SERVERS = 2;
 
 
     private static HashMap<String,String> UsersMap = new HashMap<>();
 
     private static ConcurrentHashMap<String,String> proofers = new ConcurrentHashMap<>();
 
-    private static SecretKey symmetricKey;
+    private static ArrayList<SecretKey> symmetricKeys = new ArrayList<>();
 
     private static String user;
     private static int x;
@@ -166,14 +170,13 @@ public class HDLT_user extends UserProtocolImplBase{
                     String msg = id +","+epoch+","+xCoord+","+yCoord;
 
                     /*READS PRIVATE  KEY TO SIGN */
-                    byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
-                    PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
-                    KeyFactory kf = KeyFactory.getInstance("RSA");
-                    PrivateKey privateKey = kf.generatePrivate(specPriv);
-
-                    byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
-
-                    Proof pf = Proof.newBuilder().setId(user).setDigSig(new String(Base64.getEncoder().encode(digitalSignatureToSent))).build();
+                    //byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
+                    //PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
+                    //KeyFactory kf = KeyFactory.getInstance("RSA");
+                    //PrivateKey privateKey = kf.generatePrivate(specPriv);
+                    //byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
+                    String digSig = signMessage(msg);
+                    Proof pf = Proof.newBuilder().setId(user).setDigSig(digSig).build();
 
                     responseObserver.onNext(pf);
                     responseObserver.onCompleted();
@@ -195,7 +198,6 @@ public class HDLT_user extends UserProtocolImplBase{
 
         JsonArray proofersArray = new JsonArray();
 
-
         if(!proofers.isEmpty()){
             for (Map.Entry<String, String> entry : proofers.entrySet()) {
                JsonObject o = new JsonObject();
@@ -212,57 +214,73 @@ public class HDLT_user extends UserProtocolImplBase{
         json.addProperty("xCoord",x);
         json.addProperty("yCoord",y);
         json.add("proofers",proofersArray);
-
-
         System.out.println(json.toString());
 
-        // Encriptação
-        String encryptedMessage = null;
-        IvParameterSpec ivSpec = null;
-        try {
-            ivSpec = Utils.generateIv();
-            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-
-        LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
-                .encodeToString(ivSpec.getIV())).setUser(user).build();
-        LocationResponse resp = null;
-
-        try{
-            for (int i = 1; i <= NUMBER_SERVERS ; i++) {
-                changeServer(i);
-                resp = bStub.submitLocationReport(lr);
+        for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+            changeServer(i);
+            // Encriptação
+            String encryptedMessage = null;
+            IvParameterSpec ivSpec = null;
+            String digSig = null;
+            try {
+                ivSpec = Utils.generateIv();
+                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
+                digSig = signMessage(json.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        }catch(Exception e){
-            System.err.println(e.getMessage());
-            return;
-        }
 
-        // Desencriptar - TODO PARA MULTIPLOS SERVERS
-        encryptedMessage = resp.getMessage();
-        byte[] iv =Base64.getDecoder().decode(resp.getIv());
-        String decryptedMessage = null;
-        try {
-            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                    .encodeToString(ivSpec.getIV())).setDigSig(digSig).setUser(user).build();
+            LocationResponse resp = null;
 
-        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+            try {
+                resp = bStub.submitLocationReport(lr);
+            } catch (Exception e) {
+                Throwable cause = e.getCause();
+                Status status = ((StatusException) cause).getStatus();
+                if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                    InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+                    Key responseKey = null;
+                    try{
+                        responseKey = bStub.init(initMessage);
+                        String base64SymmetricKey = responseKey.getKey();
+                        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
+                        symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
+                    } catch(Exception ex){
+                        System.err.println("ERROR: Server connection failed!");
+                        return;
+                    }
+                    SubmitLocation();
+                    return;
+                }
+                System.err.println(e.getMessage());
+                return;
+            }
 
-        Boolean bool = convertedResponse.get("Done").getAsBoolean();
+            // Desencriptar -
+            encryptedMessage = resp.getMessage();
+            byte[] iv = Base64.getDecoder().decode(resp.getIv());
+            String decryptedMessage = null;
+            try {
+                decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
-        if(bool){
-            proofers.clear();
-        }else{
-            System.err.println("Submittion failed!");
+            JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+            Boolean bool = convertedResponse.get("Done").getAsBoolean();
+
+            if (bool) {
+                proofers.clear();
+            } else {
+                System.err.println("Submittion failed!");
+            }
         }
     }
 
@@ -273,48 +291,137 @@ public class HDLT_user extends UserProtocolImplBase{
         json.addProperty("Epoch",epoch);
 
         // Encriptação
-
-        String encryptedMessage = null;
-        IvParameterSpec ivSpec = null;
-        LocationStatus resp = null;
-        try {
-            ivSpec = Utils.generateIv();
-            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
-                .encodeToString(ivSpec.getIV())).build();
-        try{
-            for (int i = 1; i <= NUMBER_SERVERS ; i++) {
-                changeServer(i);
-                resp = bStub.obtainLocationReport(gl);
+        for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+            changeServer(i);
+            String encryptedMessage = null;
+            IvParameterSpec ivSpec = null;
+            LocationStatus resp = null;
+            String digSig = null;
+            try {
+                ivSpec = Utils.generateIv();
+                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
+                digSig = signMessage(json.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        }catch(Exception e){
-            System.err.println(e.getMessage());
-            return;
+
+            GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
+                    .encodeToString(ivSpec.getIV())).setDigSig(digSig).build();
+            try{
+                resp = bStub.obtainLocationReport(gl);
+            } catch (Exception e) {
+                Throwable cause = e.getCause();
+                Status status = ((StatusException) cause).getStatus();
+                if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                    InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+                    Key responseKey = null;
+                    try{
+                        responseKey = bStub.init(initMessage);
+                        String base64SymmetricKey = responseKey.getKey();
+                        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
+                        symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
+                    } catch(Exception ex){
+                        System.err.println("ERROR: Server connection failed!");
+                        return;
+                    }
+                    ObtainLocation(epoch);
+                    return;
+                }
+                System.err.println(e.getMessage());
+                return;
+            }
+
+            encryptedMessage = resp.getMessage();
+            byte[] iv = Base64.getDecoder().decode(resp.getIv());
+            String decryptedMessage = null;
+            try {
+                decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+            int XCoord = convertedResponse.get("XCoord").getAsInt();
+            int YCoord = convertedResponse.get("YCoord").getAsInt();
+
+            System.out.println("User " + user + " are in (" + XCoord + "," + YCoord + ") at epoch " + epoch);
         }
+    }
 
-        encryptedMessage = resp.getMessage();
-        byte[] iv =Base64.getDecoder().decode(resp.getIv());
-        String decryptedMessage = null;
-        try {
-            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+    public static void requestProofs(int[] epochs){
+        JsonObject json = new JsonObject();
+        json.addProperty("userID", user);
+        JsonArray jsonEpochs = new JsonArray();
+        for (int e : epochs) {
+            JsonObject o = new JsonObject();
+            o.addProperty("epoch", e);
+            jsonEpochs.add(o);
         }
-        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+        json.add("epochs", jsonEpochs);
 
-        int XCoord = convertedResponse.get("XCoord").getAsInt();
-        int YCoord = convertedResponse.get("YCoord").getAsInt();
+        for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+            changeServer(i);
+            // Encriptação
+            String encryptedMessage = null;
+            IvParameterSpec ivSpec = null;
+            String digSig = null;
+            try {
+                ivSpec = Utils.generateIv();
+                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
+                digSig = signMessage(json.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
-        System.out.println("User "+user+" are in ("+ XCoord+","+YCoord+") at epoch "+epoch);
+            GetProofs gp = GetProofs.newBuilder().setUser(user).setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                    .encodeToString(ivSpec.getIV())).setDigSig(digSig).build();
+            ProofsResponse resp = null;
+            try {
+                resp = bStub.requestMyProofs(gp);
+            } catch (Exception e) {
+                Throwable cause = e.getCause();
+                Status status = ((StatusException) cause).getStatus();
+                if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                    InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+                    Key responseKey = null;
+                    try{
+                        responseKey = bStub.init(initMessage);
+                        String base64SymmetricKey = responseKey.getKey();
+                        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
+                        symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
+                    } catch(Exception ex){
+                        System.err.println("ERROR: Server connection failed!");
+                        return;
+                    }
+                    requestProofs(epochs);
+                    return;
+                }
+                System.err.println(e.getMessage());
+                return;
+            }
 
+            // Desencriptar -
+            encryptedMessage = resp.getMessage();
+            byte[] iv = Base64.getDecoder().decode(resp.getIv());
+            String decryptedMessage = null;
+            try {
+                decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+            //TODO - processar resposta do servidor
+        }
     }
 
     private static void changeServer(int n_server){
@@ -329,6 +436,24 @@ public class HDLT_user extends UserProtocolImplBase{
         bStub = UserServerGrpc.newBlockingStub(channel);
     }
 
+    private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
+        PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        PrivateKey privateKey = kf.generatePrivate(specPriv);
+        byte[] digSig = Utils.signMessage(privateKey, msgToSign);
+        return new String(Base64.getEncoder().encode(digSig));
+    }
+
+    public static int[] splitStrToIntArr(String theStr) {
+        String[] strArr = theStr.split(",");
+        int[] intArr = new int[strArr.length];
+        for (int i = 0; i < strArr.length; i++) {
+            String num = strArr[i];
+            intArr[i] = Integer.parseInt(num);
+        }
+        return intArr;
+    }
 
     public static void main(String[] args) throws GeneralSecurityException, IOException {
 
@@ -345,22 +470,24 @@ public class HDLT_user extends UserProtocolImplBase{
         user = args[0];
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
-        /*Connects with server 1*/
-        changeServer(1);
-
         /*READS KEYSTORE*/
+
 
         InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
         Key responseKey = null;
         try{
-            responseKey = bStub.init(initMessage); //TODO MULTIPLO SERVERS
+            for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+                changeServer(i);
+                responseKey = bStub.init(initMessage);
+                String base64SymmetricKey = responseKey.getKey();
+                byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
+                symmetricKeys.add(Utils.generateSymmetricKey(symmetricKeyBytes));
+            }
         }catch(Exception e){
             System.err.println("ERROR: Server connection failed!");
             return;
         }
-        String base64SymmetricKey = responseKey.getKey();
-        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
-        symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
+
 
         //Instancia de Servidor para os Clients
         Server svc = null;
@@ -381,6 +508,7 @@ public class HDLT_user extends UserProtocolImplBase{
         System.out.println("- RequestProof (r): requests nearby users to send proof of user location");
         System.out.println("- SubmitLocation (s): submits location report to the server");
         System.out.println("- ObtainLocation (o <epoch>): requests from the server the location of the user on the specified epoch");
+        System.out.println("- RequestMyProofs (p <epoch>,<epoch>): requests from the server the location of the user on the specified epoch");
         System.out.println("- Sleep <n> : sleeps for n milliseconds");
         System.out.println("- Epoch (e <epoch>) : Sets the user's epoch to the indicated");
 
@@ -417,6 +545,11 @@ public class HDLT_user extends UserProtocolImplBase{
                     case "e":
                         currentEpoch = Integer.parseInt(line.split(" ")[1]);
                         System.out.println("Setting time to Epoch " + currentEpoch);
+                        break;
+                    case "RequestMyProofs":
+                    case "p":
+                        int[] epochs = splitStrToIntArr(line.split(" ")[1]);
+                        System.out.println("Requesting My proofs " + currentEpoch);
                         break;
                     default:
                         System.out.println("ERROR: Incorrect command");

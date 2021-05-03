@@ -17,12 +17,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.*;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 
 import Utils.*;
 import userserver.Key;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -41,6 +45,9 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     private static HashMap<String,String> UsersMap = new HashMap<>();
     private static JsonArray reports = new JsonArray();
     private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<String, SecretKey>();
+    private static HashMap<SecretKey, Integer> userSymmetricKeysCounter = new HashMap<SecretKey, Integer>();
+
+    private static int n_server = 0;
 
     public static void readUsers() {
         try (CSVReader reader = new CSVReader(new FileReader(USERS_CONNECTION_FILE))) {
@@ -58,13 +65,64 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     }
 
     @Override
+    public void requestMyProofs(GetProofs request, StreamObserver<ProofsResponse> responseObserver) {
+        //Decoding
+        String message = null;
+        String user = null;
+        JsonObject convertedRequest = null;
+        try {
+            byte[] iv = Base64.getDecoder().decode(request.getIv());
+            user = request.getUser();
+            String encryptedMessage = request.getMessage();
+            if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                System.err.println("ERROR: No Key for User " + user);
+                responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                return;
+            }
+            SecretKey sk = userSymmetricKeys.get(user);
+            int counter = userSymmetricKeysCounter.get(sk);
+            if (counter == 0) { //throw error: key timeout
+                System.err.println("ERROR: Key Timeout");
+                userSymmetricKeysCounter.remove(sk);
+                userSymmetricKeys.remove(user);
+                responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                return;
+            }
+            message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+            userSymmetricKeysCounter.replace(sk, counter-1);
+            convertedRequest = new Gson().fromJson(message, JsonObject.class);
+        } catch (Exception e) {
+            System.err.println("ERROR: Invalid key");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+            return;
+        }
+
+        if(!verifyMessage(user,message,request.getDigSig())){
+            System.err.println("ERROR: Message not Verified");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+            return;
+        }
+        int[] setEpochs = null;
+        JsonArray a = convertedRequest.get("userID").getAsJsonArray();
+        for( JsonElement o : a){
+            setEpochs[setEpochs.length] = o.getAsInt();
+        }
+
+
+
+
+    }
+
+    @Override
     public void init(InitMessage request, StreamObserver<Key> responseObserver) {
        String user = request.getUser();
        SecretKey secretKey = null;
         try {
             secretKey = AESKeyGenerator.write();
             userSymmetricKeys.put(user,secretKey);
-            saveKeysToFile();
+            userSymmetricKeysCounter.put(secretKey, 10);
+            //TODO - init is vulnerable to spoofing/replay attacks. we need to address this.
+            //saveKeysToFile();
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -101,15 +159,34 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         try {
             byte[] iv = Base64.getDecoder().decode(request.getIv());
             user = request.getUser();
+            if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                System.err.println("ERROR: No Key for User " + user);
+                responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                return;
+            }
             String encryptedMessage = request.getMessage();
-            message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
-            convertedRequest= new Gson().fromJson(message, JsonObject.class);
+            SecretKey sk = userSymmetricKeys.get(user);
+            int counter = userSymmetricKeysCounter.get(sk);
+            if (counter == 0) { //throw error: key timeout
+                System.err.println("ERROR: Key Timeout");
+                userSymmetricKeysCounter.remove(sk);
+                userSymmetricKeys.remove(user);
+                responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                return;
+            }
+            message = Utils.decryptMessageSymmetric(sk, encryptedMessage, iv);
+            userSymmetricKeysCounter.replace(sk, counter-1);
+            convertedRequest = new Gson().fromJson(message, JsonObject.class);
         } catch (Exception e) {
             System.err.println("ERROR: Invalid key");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
             return;
         }
-
+        if(!verifyMessage(user,message,request.getDigSig())){
+            System.err.println("ERROR: Message not Verified");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+            return;
+        }
         String requester = convertedRequest.get("userID").getAsString();
 
         if(!requester.equals(user)){
@@ -266,15 +343,37 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         //Decoding
         String message = null;
         JsonObject convertedRequest = null;
+        String digSig = request.getDigSig();
         try {
             byte[] iv = Base64.getDecoder().decode(request.getIv());
             String user = request.getUser();
             String encryptedMessage = request.getMessage();
-            message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
-            convertedRequest= new Gson().fromJson(message, JsonObject.class);
+            if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                System.err.println("ERROR: Key for user " + user + "not found");
+                responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                return;
+            }
+            SecretKey sk = userSymmetricKeys.get(user);
+            int counter = userSymmetricKeysCounter.get(sk);
+            if (counter == 0) { //throw error: key timeout
+                System.err.println("ERROR: Key Timeout");
+                userSymmetricKeysCounter.remove(sk);
+                userSymmetricKeys.remove(user);
+                responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                return;
+            }
+            message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+            userSymmetricKeysCounter.replace(sk, counter-1);
+            convertedRequest = new Gson().fromJson(message, JsonObject.class);
         } catch (Exception e) {
             System.err.println("ERROR: Invalid key");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+            return;
+        }
+
+        if(!verifyMessage(request.getUser(),message,request.getDigSig())){
+            System.err.println("ERROR: Message not Verified");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
             return;
         }
 
@@ -329,6 +428,28 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         responseObserver.onCompleted();
     }
 
+    public static boolean verifyMessage(String user, String message, String digSig) {
+        try {
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+
+            byte[] publicKeyBytes = new byte[0];
+
+            publicKeyBytes = Files.readAllBytes(Paths.get("keys/" + user));
+            X509EncodedKeySpec specPublic = new X509EncodedKeySpec(publicKeyBytes);
+            PublicKey publicKey = kf.generatePublic(specPublic);
+
+            if (Utils.verifySignature(message, digSig, publicKey)) {
+                System.out.println("Message Signature Verified!");
+                return true;
+            } else {
+                System.out.println("Message Signature Not Verified!");
+                return false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 
     public static class HA_Server extends HAProtocolGrpc.HAProtocolImplBase {
 
@@ -547,7 +668,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
     public static void main(String[] args) throws IOException {
         readUsers();
-        int n_server = Integer.parseInt(args[0]);
+        n_server = Integer.parseInt(args[0]);
         int svcPort = Integer.parseInt(UsersMap.get("server").split(":")[1]) + n_server;
         int svcPort_HA = svcPort + 50 + n_server;
         Server svc = null;
