@@ -4,23 +4,23 @@ package Utils;
 import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.security.*;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Scanner;
 
 
 public class Utils {
     private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
     private static final String MODE = "OFB";
     private static IvParameterSpec iv;
+
 
     static {
         try {
@@ -39,6 +39,17 @@ public class Utils {
         }
         return new String(hexChars);
     }
+    /* s must be an even-length string. */
+    public static byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                    + Character.digit(s.charAt(i+1), 16));
+        }
+        return data;
+    }
+
     public static boolean verifySignature(String message, String digitalSignature, PublicKey publicKey) throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException {
         byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
         MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -102,21 +113,26 @@ public class Utils {
         return new SecretKeySpec(keyBytes, 0, keyBytes.length, "AES");
     }
 
-    public static String encryptMessageAssymetric(Key key, String message) throws GeneralSecurityException, IOException {
+
+    public static byte[] decryptMessageAssymetric(String keyFile, String password,String message) throws GeneralSecurityException, IOException {
+
+        /*LOADS KEYSTORE*/
+        KeyStore ks = null;
+        try{
+            ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream(keyFile), password.toCharArray());
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+        }
+
+        /*LOADS PRIVATE KEY FROM KEYSTORE*/
+        Key privateKey = ks.getKey("1", password.toCharArray());
+
+
+        /*DECRYPTS THE MESSAGE*/
+
         Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.ENCRYPT_MODE, key);
-
-        byte[] resultBytes = cipher.doFinal(message.getBytes());
-
-        return Base64.getEncoder()
-                .encodeToString(resultBytes);
-    }
-
-
-    public static byte[] decryptMessageAssymetric(String keyFile, String message) throws GeneralSecurityException, IOException {
-        PrivateKey key = readPriv(keyFile);
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.DECRYPT_MODE, key);
+        cipher.init(Cipher.DECRYPT_MODE, privateKey);
 
         byte[] cipheredBytes = Base64.getDecoder().decode(message);
 
@@ -135,33 +151,28 @@ public class Utils {
                 .encodeToString(resultBytes);
     }
 
-    public static SecretKey decryptSymmetricKey(String keyFile, String message) throws GeneralSecurityException, IOException {
-        PrivateKey key = readPriv(keyFile);
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.DECRYPT_MODE, key);
-
-        byte[] cipheredBytes = Base64.getDecoder().decode(message);
-
-        byte[] resultBytes = cipher.doFinal(cipheredBytes);
-
-        return  generateSymmetricKey(resultBytes);
-    }
 
 
-    public static PrivateKey readPriv(String keyPath) throws GeneralSecurityException, IOException {
-        byte[] keyBytes = Files.readAllBytes(Paths.get(keyPath));
-
-        PKCS8EncodedKeySpec spec =
-                new PKCS8EncodedKeySpec(keyBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        return kf.generatePrivate(spec);
-    }
     public static PublicKey readPub(String keyPath) throws GeneralSecurityException, IOException {
-        byte[] keyBytes = Files.readAllBytes(Paths.get(keyPath));
+        File f = new File(keyPath);
+        FileInputStream fis = new FileInputStream(f);
+        DataInputStream dis = new DataInputStream(fis);
+        byte[] keyBytes = new byte[(int)f.length()];
+        dis.readFully(keyBytes);
+        dis.close();
+
 
         X509EncodedKeySpec spec =
                 new X509EncodedKeySpec(keyBytes);
         KeyFactory kf = KeyFactory.getInstance("RSA");
         return kf.generatePublic(spec);
     }
+
+
+    public static String getPasswordInput(){
+        System.out.print("Please enter the password to unlock the Key file: ");
+        Scanner scanner = new Scanner(System. in);
+        return scanner. nextLine();
+    }
+
 }

@@ -167,7 +167,11 @@ public class HDLT_Ha {
             return;
         }
         String base64SymmetricKey = responseKey.getKey();
-        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keys/" + user + ".key",base64SymmetricKey);
+
+        /*GETS THE USER PASSWORD FROM INPUT*/
+        String password = Utils.getPasswordInput();
+
+        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
         symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
 
         System.out.println("\nAvailable commands:");

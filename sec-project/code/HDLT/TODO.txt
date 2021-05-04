@@ -2,7 +2,7 @@ Old TODO:
 - hmac ou assinatura digital - DONE
 - chave simetrica (timeout para gerar nova chave) - DONE
 - server crash (gerar nova chave; não guardar chaves) - DONE (ACHO EU)
-- usar keystores
+- usar keystores - DONE
 - questao dos bizantinos no relatorio
 - são precisos f proofs para o servidor aceitar
 - garantir freshness nas mensagens (nounces, counters) ???
