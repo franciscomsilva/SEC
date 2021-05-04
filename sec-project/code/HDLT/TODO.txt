@@ -4,13 +4,13 @@ Old TODO:
 - server crash (gerar nova chave; não guardar chaves) - DONE (ACHO EU)
 - usar keystores - DONE
 - questao dos bizantinos no relatorio
-- são precisos f proofs para o servidor aceitar
+- são precisos f proofs para o servidor aceitar - DONE (ja estava? 3 proofers)
 - garantir freshness nas mensagens (nounces, counters) ???
 
 
 New TODO:
 - dupla chamada aos servidores, no caso de exceções RESOURCE_EXHAUSTED e NOT_FOUND
-
+- implementar (1,N) Byzantine Regular -  on going
 
 Stage 2:
 - step 1 - DONE
