@@ -446,13 +446,10 @@ public class HDLT_user extends UserProtocolImplBase{
         bStub = UserServerGrpc.newBlockingStub(channel);
     }
 
-    private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
-        byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
-        PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        PrivateKey privateKey = kf.generatePrivate(specPriv);
-        byte[] digSig = Utils.signMessage(privateKey, msgToSign);
-        return new String(Base64.getEncoder().encode(digSig));
+    private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, UnrecoverableKeyException, KeyStoreException {
+        String password = Utils.getPasswordInput();
+        byte[] messageSigned = Utils.signMessage("keystores/keystore_" + user + ".keystore",password,msgToSign);
+        return new String(Base64.getEncoder().encode(messageSigned));
     }
 
     public static int[] splitStrToIntArr(String theStr) {

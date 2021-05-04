@@ -63,7 +63,20 @@ public class Utils {
         return Arrays.equals(messageHash,receivedHash);
     }
 
-    public static byte[] signMessage(PrivateKey privateKey, String message) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+    public static byte[] signMessage(String keypath, String password,String message) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, UnrecoverableKeyException, KeyStoreException {
+        /*LOADS KEYSTORE*/
+        KeyStore ks = null;
+        try{
+            ks = KeyStore.getInstance("JKS");
+            ks.load(new FileInputStream(keypath), password.toCharArray());
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+        }
+
+        /*LOADS PRIVATE KEY FROM KEYSTORE*/
+        Key privateKey = ks.getKey("1", password.toCharArray());
+
+
         byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
         MessageDigest md = MessageDigest.getInstance("SHA-256");
         byte[] messageHash = md.digest(messageBytes);

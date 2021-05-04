@@ -168,13 +168,8 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                     if (xCoord == coords[1] && yCoord == coords[2]){
                         String msg = id +","+epoch+","+xCoord+","+yCoord;
 
-                        /*READS PRIVATE  KEY TO SIGN */
-                        byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
-                        PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
-                        KeyFactory kf = KeyFactory.getInstance("RSA");
-                        PrivateKey privateKey = kf.generatePrivate(specPriv);
-
-                        byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
+                        String password = Utils.getPasswordInput();
+                        byte[] digitalSignatureToSent = Utils.signMessage("keystores/keystore_" + user + ".keystore",password,msg);
 
                         Proof pf = Proof.newBuilder().setId(user).setDigSig(new String(Base64.getEncoder().encode(digitalSignatureToSent))).build();
 
@@ -216,13 +211,8 @@ public class HDLT_byzantine_user extends UserProtocolImplBase{
                     if (xCoord == coords[1] && yCoord == coords[2]){
                         String msg = id +","+epoch+","+5+","+5;
 
-                        /*READS PRIVATE  KEY TO SIGN */
-                        byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
-                        PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
-                        KeyFactory kf = KeyFactory.getInstance("RSA");
-                        PrivateKey privateKey = kf.generatePrivate(specPriv);
-
-                        byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
+                        String password = Utils.getPasswordInput();
+                        byte[] digitalSignatureToSent = Utils.signMessage("keystores/keystore_" + user + ".keystore",password,msg);
 
                         Proof pf = Proof.newBuilder().setId(user).setDigSig(new String(Base64.getEncoder().encode(digitalSignatureToSent))).build();
 
