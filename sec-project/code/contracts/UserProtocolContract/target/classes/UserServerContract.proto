@@ -15,9 +15,13 @@ service UserServer {
 
 message InitMessage {
     string user = 1;
+    int32 counter = 2;
+    string digSig = 3;
 }
 message Key {
     string key = 1;
+    int32 counter = 2;
+    string digSig = 3;
 }
 message LocationReport {
     string user = 1;

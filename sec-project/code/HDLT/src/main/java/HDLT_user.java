@@ -18,6 +18,7 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 
+import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -43,7 +44,7 @@ public class HDLT_user extends UserProtocolImplBase{
     private static String USERS_CONNECTION_FILE = "files/users_connection.txt";
     private static String MAP_GRID_FILE = "files/map_grid.txt";
     private static int NUMBER_SERVERS = 2;
-
+    private static HashMap<String,Integer> counters = new HashMap<>();
 
     private static HashMap<String,String> UsersMap = new HashMap<>();
 
@@ -170,11 +171,6 @@ public class HDLT_user extends UserProtocolImplBase{
                     String msg = id +","+epoch+","+xCoord+","+yCoord;
 
                     /*READS PRIVATE  KEY TO SIGN */
-                    //byte[] privKeyBytes = Files.readAllBytes(Paths.get("keys/"+user+".key"));
-                    //PKCS8EncodedKeySpec specPriv = new PKCS8EncodedKeySpec(privKeyBytes);
-                    //KeyFactory kf = KeyFactory.getInstance("RSA");
-                    //PrivateKey privateKey = kf.generatePrivate(specPriv);
-                    //byte[] digitalSignatureToSent = Utils.signMessage(privateKey,msg);
                     String digSig = signMessage(msg);
                     Proof pf = Proof.newBuilder().setId(user).setDigSig(digSig).build();
 
@@ -222,6 +218,10 @@ public class HDLT_user extends UserProtocolImplBase{
             String encryptedMessage = null;
             IvParameterSpec ivSpec = null;
             String digSig = null;
+            int counter = counters.get("server" + i) + 1;
+            counters.put("server" + i, counter);
+
+            json.addProperty("counter",counter);
             try {
                 ivSpec = Utils.generateIv();
                 encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
@@ -279,12 +279,44 @@ public class HDLT_user extends UserProtocolImplBase{
 
             Boolean bool = convertedResponse.get("Done").getAsBoolean();
 
+            if(convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)){
+                System.err.println("ERROR: Wrong mess received");
+                bool = false;
+            }
+
+            if(!verifyMessage("server"+i,json.toString(),resp.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                bool = false;
+            }
             if (bool) {
                 proofers.clear();
             } else {
                 System.err.println("Submittion failed!");
             }
         }
+    }
+
+    public static boolean verifyMessage(String server, String message, String digSig) {
+        try {
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+
+            byte[] publicKeyBytes = new byte[0];
+
+            publicKeyBytes = Files.readAllBytes(Paths.get("keys/" + server));
+            X509EncodedKeySpec specPublic = new X509EncodedKeySpec(publicKeyBytes);
+            PublicKey publicKey = kf.generatePublic(specPublic);
+
+            if (Utils.verifySignature(message, digSig, publicKey)) {
+                System.out.println("Message Signature Verified!");
+                return true;
+            } else {
+                System.out.println("Message Signature Not Verified!");
+                return false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     public static void ObtainLocation(int epoch){
@@ -478,13 +510,29 @@ public class HDLT_user extends UserProtocolImplBase{
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
 
-        InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+
         Key responseKey = null;
+        int i = 0;
         try{
-            for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+            Random r = new Random(System.currentTimeMillis());
+            int counter = 0;
+            String digSig = null, message = null;
+            for (i = 1; i <= NUMBER_SERVERS ; i++) {
                 changeServer(i);
+
+                /*INITIALIZES COUNTER*/
+                counter = r.nextInt();
+                counters.put("server" + i, counter);
+                message = user + "," + counter;
+                digSig = signMessage(message);
+
+                InitMessage initMessage = InitMessage.newBuilder().setUser(user).setCounter(counter).setDigSig(digSig).build();
+
                 responseKey = bStub.init(initMessage);
+
                 String base64SymmetricKey = responseKey.getKey();
+                counters.put("server"+i, responseKey.getCounter());
+
                 /*GETS THE USER PASSWORD FROM INPUT*/
                 String password = Utils.getPasswordInput();
 
@@ -493,6 +541,7 @@ public class HDLT_user extends UserProtocolImplBase{
             }
         }catch(Exception e){
             System.err.println("ERROR: Server connection failed!");
+            counters.remove("server" + i);
             return;
         }
 

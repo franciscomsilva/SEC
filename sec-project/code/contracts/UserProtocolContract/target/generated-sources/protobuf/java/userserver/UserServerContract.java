@@ -65,27 +65,28 @@ public final class UserServerContract {
     java.lang.String[] descriptorData = {
       "\n\030UserServerContract.proto\022\nuserserver\032\033" +
       "google/protobuf/empty.proto\032\037google/prot" +
-      "obuf/timestamp.proto\"\033\n\013InitMessage\022\014\n\004u" +
-      "ser\030\001 \001(\t\"\022\n\003Key\022\013\n\003key\030\001 \001(\t\"K\n\016Locatio" +
-      "nReport\022\014\n\004user\030\001 \001(\t\022\017\n\007message\030\002 \001(\t\022\n" +
-      "\n\002iv\030\003 \001(\t\022\016\n\006digSig\030\004 \001(\t\"?\n\020LocationRe" +
-      "sponse\022\017\n\007message\030\001 \001(\t\022\n\n\002iv\030\002 \001(\t\022\016\n\006d" +
-      "igSig\030\003 \001(\t\"H\n\013GetLocation\022\014\n\004user\030\001 \001(\t" +
-      "\022\017\n\007message\030\002 \001(\t\022\n\n\002iv\030\003 \001(\t\022\016\n\006digSig\030" +
-      "\004 \001(\t\"=\n\016LocationStatus\022\017\n\007message\030\001 \001(\t" +
-      "\022\n\n\002iv\030\002 \001(\t\022\016\n\006digSig\030\003 \001(\t\"F\n\tGetProof" +
-      "s\022\014\n\004user\030\001 \001(\t\022\017\n\007message\030\002 \001(\t\022\n\n\002iv\030\003" +
-      " \001(\t\022\016\n\006digSig\030\004 \001(\t\"=\n\016ProofsResponse\022\017" +
-      "\n\007message\030\001 \001(\t\022\n\n\002iv\030\002 \001(\t\022\016\n\006digSig\030\003 " +
-      "\001(\t2\243\002\n\nUserServer\0220\n\004init\022\027.userserver." +
-      "InitMessage\032\017.userserver.Key\022P\n\024submitLo" +
-      "cationReport\022\032.userserver.LocationReport" +
-      "\032\034.userserver.LocationResponse\022K\n\024obtain" +
-      "LocationReport\022\027.userserver.GetLocation\032" +
-      "\032.userserver.LocationStatus\022D\n\017requestMy" +
-      "Proofs\022\025.userserver.GetProofs\032\032.userserv" +
-      "er.ProofsResponseB\016\n\nuserserverP\001b\006proto" +
-      "3"
+      "obuf/timestamp.proto\"<\n\013InitMessage\022\014\n\004u" +
+      "ser\030\001 \001(\t\022\017\n\007counter\030\002 \001(\005\022\016\n\006digSig\030\003 \001" +
+      "(\t\"3\n\003Key\022\013\n\003key\030\001 \001(\t\022\017\n\007counter\030\002 \001(\005\022" +
+      "\016\n\006digSig\030\003 \001(\t\"K\n\016LocationReport\022\014\n\004use" +
+      "r\030\001 \001(\t\022\017\n\007message\030\002 \001(\t\022\n\n\002iv\030\003 \001(\t\022\016\n\006" +
+      "digSig\030\004 \001(\t\"?\n\020LocationResponse\022\017\n\007mess" +
+      "age\030\001 \001(\t\022\n\n\002iv\030\002 \001(\t\022\016\n\006digSig\030\003 \001(\t\"H\n" +
+      "\013GetLocation\022\014\n\004user\030\001 \001(\t\022\017\n\007message\030\002 " +
+      "\001(\t\022\n\n\002iv\030\003 \001(\t\022\016\n\006digSig\030\004 \001(\t\"=\n\016Locat" +
+      "ionStatus\022\017\n\007message\030\001 \001(\t\022\n\n\002iv\030\002 \001(\t\022\016" +
+      "\n\006digSig\030\003 \001(\t\"F\n\tGetProofs\022\014\n\004user\030\001 \001(" +
+      "\t\022\017\n\007message\030\002 \001(\t\022\n\n\002iv\030\003 \001(\t\022\016\n\006digSig" +
+      "\030\004 \001(\t\"=\n\016ProofsResponse\022\017\n\007message\030\001 \001(" +
+      "\t\022\n\n\002iv\030\002 \001(\t\022\016\n\006digSig\030\003 \001(\t2\243\002\n\nUserSe" +
+      "rver\0220\n\004init\022\027.userserver.InitMessage\032\017." +
+      "userserver.Key\022P\n\024submitLocationReport\022\032" +
+      ".userserver.LocationReport\032\034.userserver." +
+      "LocationResponse\022K\n\024obtainLocationReport" +
+      "\022\027.userserver.GetLocation\032\032.userserver.L" +
+      "ocationStatus\022D\n\017requestMyProofs\022\025.users" +
+      "erver.GetProofs\032\032.userserver.ProofsRespo" +
+      "nseB\016\n\nuserserverP\001b\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -106,13 +107,13 @@ public final class UserServerContract {
     internal_static_userserver_InitMessage_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_userserver_InitMessage_descriptor,
-        new java.lang.String[] { "User", });
+        new java.lang.String[] { "User", "Counter", "DigSig", });
     internal_static_userserver_Key_descriptor =
       getDescriptor().getMessageTypes().get(1);
     internal_static_userserver_Key_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_userserver_Key_descriptor,
-        new java.lang.String[] { "Key", });
+        new java.lang.String[] { "Key", "Counter", "DigSig", });
     internal_static_userserver_LocationReport_descriptor =
       getDescriptor().getMessageTypes().get(2);
     internal_static_userserver_LocationReport_fieldAccessorTable = new

@@ -1,16 +1,19 @@
 Old TODO:
 - hmac ou assinatura digital - DONE
 - chave simetrica (timeout para gerar nova chave) - DONE
-- server crash (gerar nova chave; não guardar chaves) - DONE (ACHO EU)
+- server crash (gerar nova chave; não guardar chaves) - DONE
 - usar keystores - DONE
-- questao dos bizantinos no relatorio
-- são precisos f proofs para o servidor aceitar - DONE (ja estava? 3 proofers)
-- garantir freshness nas mensagens (nounces, counters) ???
-
+- questao dos bizantinos no relatorio - TODO
+- são precisos f proofs para o servidor aceitar - DONE
+- garantir freshness nas mensagens (nounces, counters) - DONE
+- assinatura digital na mensagem init - DONE
+- assinaturas digitais no lado do servidor - TODO
+- verificação dos counters no lado do servidor - DONE
 
 New TODO:
 - dupla chamada aos servidores, no caso de exceções RESOURCE_EXHAUSTED e NOT_FOUND
 - implementar (1,N) Byzantine Regular -  on going
+- Terminar verificar counters e digSig em todas as mensagens do user (francisco)
 
 Stage 2:
 - step 1 - DONE

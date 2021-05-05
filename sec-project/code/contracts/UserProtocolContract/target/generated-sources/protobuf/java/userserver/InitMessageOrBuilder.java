@@ -16,4 +16,19 @@ public interface InitMessageOrBuilder extends
    */
   com.google.protobuf.ByteString
       getUserBytes();
+
+  /**
+   * <code>int32 counter = 2;</code>
+   */
+  int getCounter();
+
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  java.lang.String getDigSig();
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  com.google.protobuf.ByteString
+      getDigSigBytes();
 }

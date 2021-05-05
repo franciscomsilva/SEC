@@ -17,6 +17,8 @@ private static final long serialVersionUID = 0L;
   }
   private InitMessage() {
     user_ = "";
+    counter_ = 0;
+    digSig_ = "";
   }
 
   @java.lang.Override
@@ -54,6 +56,17 @@ private static final long serialVersionUID = 0L;
             java.lang.String s = input.readStringRequireUtf8();
 
             user_ = s;
+            break;
+          }
+          case 16: {
+
+            counter_ = input.readInt32();
+            break;
+          }
+          case 26: {
+            java.lang.String s = input.readStringRequireUtf8();
+
+            digSig_ = s;
             break;
           }
         }
@@ -114,6 +127,49 @@ private static final long serialVersionUID = 0L;
     }
   }
 
+  public static final int COUNTER_FIELD_NUMBER = 2;
+  private int counter_;
+  /**
+   * <code>int32 counter = 2;</code>
+   */
+  public int getCounter() {
+    return counter_;
+  }
+
+  public static final int DIGSIG_FIELD_NUMBER = 3;
+  private volatile java.lang.Object digSig_;
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  public java.lang.String getDigSig() {
+    java.lang.Object ref = digSig_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      digSig_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  public com.google.protobuf.ByteString
+      getDigSigBytes() {
+    java.lang.Object ref = digSig_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      digSig_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
   private byte memoizedIsInitialized = -1;
   public final boolean isInitialized() {
     byte isInitialized = memoizedIsInitialized;
@@ -129,6 +185,12 @@ private static final long serialVersionUID = 0L;
     if (!getUserBytes().isEmpty()) {
       com.google.protobuf.GeneratedMessageV3.writeString(output, 1, user_);
     }
+    if (counter_ != 0) {
+      output.writeInt32(2, counter_);
+    }
+    if (!getDigSigBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 3, digSig_);
+    }
     unknownFields.writeTo(output);
   }
 
@@ -139,6 +201,13 @@ private static final long serialVersionUID = 0L;
     size = 0;
     if (!getUserBytes().isEmpty()) {
       size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, user_);
+    }
+    if (counter_ != 0) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeInt32Size(2, counter_);
+    }
+    if (!getDigSigBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, digSig_);
     }
     size += unknownFields.getSerializedSize();
     memoizedSize = size;
@@ -158,6 +227,10 @@ private static final long serialVersionUID = 0L;
     boolean result = true;
     result = result && getUser()
         .equals(other.getUser());
+    result = result && (getCounter()
+        == other.getCounter());
+    result = result && getDigSig()
+        .equals(other.getDigSig());
     result = result && unknownFields.equals(other.unknownFields);
     return result;
   }
@@ -171,6 +244,10 @@ private static final long serialVersionUID = 0L;
     hash = (19 * hash) + getDescriptor().hashCode();
     hash = (37 * hash) + USER_FIELD_NUMBER;
     hash = (53 * hash) + getUser().hashCode();
+    hash = (37 * hash) + COUNTER_FIELD_NUMBER;
+    hash = (53 * hash) + getCounter();
+    hash = (37 * hash) + DIGSIG_FIELD_NUMBER;
+    hash = (53 * hash) + getDigSig().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -302,6 +379,10 @@ private static final long serialVersionUID = 0L;
       super.clear();
       user_ = "";
 
+      counter_ = 0;
+
+      digSig_ = "";
+
       return this;
     }
 
@@ -325,6 +406,8 @@ private static final long serialVersionUID = 0L;
     public userserver.InitMessage buildPartial() {
       userserver.InitMessage result = new userserver.InitMessage(this);
       result.user_ = user_;
+      result.counter_ = counter_;
+      result.digSig_ = digSig_;
       onBuilt();
       return result;
     }
@@ -368,6 +451,13 @@ private static final long serialVersionUID = 0L;
       if (other == userserver.InitMessage.getDefaultInstance()) return this;
       if (!other.getUser().isEmpty()) {
         user_ = other.user_;
+        onChanged();
+      }
+      if (other.getCounter() != 0) {
+        setCounter(other.getCounter());
+      }
+      if (!other.getDigSig().isEmpty()) {
+        digSig_ = other.digSig_;
         onChanged();
       }
       this.mergeUnknownFields(other.unknownFields);
@@ -462,6 +552,101 @@ private static final long serialVersionUID = 0L;
   checkByteStringIsUtf8(value);
       
       user_ = value;
+      onChanged();
+      return this;
+    }
+
+    private int counter_ ;
+    /**
+     * <code>int32 counter = 2;</code>
+     */
+    public int getCounter() {
+      return counter_;
+    }
+    /**
+     * <code>int32 counter = 2;</code>
+     */
+    public Builder setCounter(int value) {
+      
+      counter_ = value;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>int32 counter = 2;</code>
+     */
+    public Builder clearCounter() {
+      
+      counter_ = 0;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object digSig_ = "";
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public java.lang.String getDigSig() {
+      java.lang.Object ref = digSig_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        digSig_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public com.google.protobuf.ByteString
+        getDigSigBytes() {
+      java.lang.Object ref = digSig_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        digSig_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public Builder setDigSig(
+        java.lang.String value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  
+      digSig_ = value;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public Builder clearDigSig() {
+      
+      digSig_ = getDefaultInstance().getDigSig();
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public Builder setDigSigBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+      
+      digSig_ = value;
       onChanged();
       return this;
     }
