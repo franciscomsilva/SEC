@@ -20,6 +20,7 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import Utils.*;
 import userserver.Key;
@@ -37,7 +38,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
     private static String REPORTS_FILE = "files/location_reports.json";
-    private static String SYMMETRICS_FILE = "files/symmetric_keys";
     private static String USERS_CONNECTION_FILE =  "files/users_connection.txt";
 
     private static int BYZANTINE_USERS = 3;
@@ -97,7 +97,9 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
         try {
             String encryptedKey = Utils.encryptSymmetricKey(pubKey,secretKey);
-            Key symmetricKeyResponse = Key.newBuilder().setKey(encryptedKey).setCounter(c+1).build();
+            String msg = encryptedKey + "," + (c+1);
+            String digSig = signMessage(msg);
+            Key symmetricKeyResponse = Key.newBuilder().setKey(encryptedKey).setCounter(c+1).setDigSig(digSig).build();
             responseObserver.onNext(symmetricKeyResponse);
             responseObserver.onCompleted();
             userCounters.put(user, c+1);
@@ -286,18 +288,19 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         userCounters.replace(user, c+1);
 
         //Encriptação
-        String resp = null;
+        String resp = null, respDigSig = null;
         IvParameterSpec iv = null;
         try {
             iv = Utils.generateIv();
             resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
+            respDigSig = signMessage(json.toString());
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
         LocationResponse lr = LocationResponse.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
-                .encodeToString(iv.getIV())).build();
+                .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
         responseObserver.onNext(lr);
         responseObserver.onCompleted();
     }
@@ -382,18 +385,19 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         userCounters.replace(user, c+1);
 
         //Encriptação
-        String resp = null;
+        String resp = null, respDigSig = null;
         IvParameterSpec iv = null;
         try {
             iv = Utils.generateIv();
             resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
+            respDigSig = signMessage(json.toString());
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
         LocationStatus ls = LocationStatus.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
-                .encodeToString(iv.getIV())).build();
+                .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
 
         System.out.println("INFO: Sent location report for " + requester +  " at epoch " + epoch);
         responseObserver.onNext(ls);
@@ -446,15 +450,56 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             return;
         }
 
-        int[] setEpochs = null;
-        JsonArray a = convertedRequest.get("userID").getAsJsonArray();
-        for( JsonElement o : a){
-            setEpochs[setEpochs.length] = o.getAsInt();
+        String s = convertedRequest.get("epochs").getAsString();
+        int[] eps = Arrays.stream(s.split(",")).mapToInt(Integer::parseInt).toArray();
+        ArrayList<Integer> epochs = (ArrayList<Integer>) Arrays.stream(eps).boxed().collect(Collectors.toList());
+
+        JsonArray data = new JsonArray();
+        for (JsonElement je : reports) {
+            JsonObject jo = je.getAsJsonObject();
+            int epoch = jo.get("epoch").getAsInt();
+            if (epochs.contains(epoch)) {
+                JsonArray reps = jo.get("reports").getAsJsonArray();
+                for (JsonElement r : reps) {
+                    JsonArray proofers = r.getAsJsonObject().get("proofers").getAsJsonArray();
+                    for (JsonElement p : proofers) {
+                        String u = p.getAsJsonObject().get("userID").getAsString();
+                        if (u.equals(user)) {
+                            JsonObject json = new JsonObject();
+                            json.addProperty("epoch", epoch);
+                            json.addProperty("user", r.getAsJsonObject().get("user").getAsString());
+                            json.addProperty("xCoord", r.getAsJsonObject().get("coordX").getAsString());
+                            json.addProperty("yCoord", r.getAsJsonObject().get("coordY").getAsString());
+                            json.addProperty("digSig", p.getAsJsonObject().get("digSIG").getAsString());
+                            data.add(json);
+                        }
+                    }
+                }
+            }
         }
+        JsonObject jo = new JsonObject();
+        jo.addProperty("counter",c+1);
+        data.add(jo);
+        userCounters.replace(user, c+1);
 
-        //TODO: FINISH
+        //Encriptação
+        String resp = null, respDigSig = null;
+        IvParameterSpec iv = null;
+        try {
+            iv = Utils.generateIv();
+            resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(user),data.toString(),iv);
+            respDigSig = signMessage(data.toString());
+        } catch (GeneralSecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        ProofsResponse pr = ProofsResponse.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
 
-
+        System.out.println("INFO: Sent proofs of " + user +  " at requested epochs");
+        responseObserver.onNext(pr);
+        responseObserver.onCompleted();
     }
 
     public static boolean verifyMessage(String user, String message, String digSig) {
@@ -667,6 +712,11 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
     }
 
+    private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, UnrecoverableKeyException, KeyStoreException {
+        String password = Utils.getPasswordInput();
+        byte[] messageSigned = Utils.signMessage("keystores/keystore_server" + n_server + ".keystore", password, msgToSign);
+        return new String(Base64.getEncoder().encode(messageSigned));
+    }
 
     public static void main(String[] args) throws IOException {
         readUsers();

@@ -115,7 +115,7 @@ public class HDLT_user extends UserProtocolImplBase{
         }
         return RadiusUsers;
     }
-
+    /*Requests location proofs to other users nearby*/
     public static void requestProof(int epoch) throws InterruptedException {
 
         HashMap<String,double []> RadiusUsers = new HashMap<>();
@@ -154,6 +154,7 @@ public class HDLT_user extends UserProtocolImplBase{
         }
     }
 
+    /*Receives a request to proof a users' location and responds*/
     @Override
     public void requestLocationProof(LocationRequest request, StreamObserver<Proof> responseObserver)  {
         //Geração da Proof
@@ -170,7 +171,6 @@ public class HDLT_user extends UserProtocolImplBase{
                 if (xCoord == coords[1] && yCoord == coords[2]){
                     String msg = id +","+epoch+","+xCoord+","+yCoord;
 
-                    /*READS PRIVATE  KEY TO SIGN */
                     String digSig = signMessage(msg);
                     Proof pf = Proof.newBuilder().setId(user).setDigSig(digSig).build();
 
@@ -190,7 +190,46 @@ public class HDLT_user extends UserProtocolImplBase{
         }
     }
 
-    public static void SubmitLocation(){
+    public static void init(int i) {
+        Random r = new Random(System.currentTimeMillis());
+        int counter = 0;
+        String digSig = null, message = null;
+
+        /*INITIALIZES COUNTER*/
+        counter = r.nextInt();
+        counters.put("server" + i, counter);
+        message = user + "," + counter;
+        try {
+            digSig = signMessage(message);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        InitMessage initMessage = InitMessage.newBuilder().setUser(user).setCounter(counter).setDigSig(digSig).build();
+
+        Key responseKey = bStub.init(initMessage);
+
+        String base64SymmetricKey = responseKey.getKey();
+        int c = responseKey.getCounter();
+        counters.put("server"+i, c);
+
+        /*GETS THE USER PASSWORD FROM INPUT*/
+        String password = Utils.getPasswordInput();
+
+        byte[] symmetricKeyBytes = new byte[0];
+        try {
+            symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if(!verifyMessage("server"+i, base64SymmetricKey+","+c, responseKey.getDigSig())){
+            System.err.println("ERROR: Message not Verified");
+            return;
+        }
+        symmetricKeys.add(Utils.generateSymmetricKey(symmetricKeyBytes));
+    }
+
+    public static void SubmitLocation(int[] servers){
 
         JsonArray proofersArray = new JsonArray();
 
@@ -212,7 +251,7 @@ public class HDLT_user extends UserProtocolImplBase{
         json.add("proofers",proofersArray);
         System.out.println(json.toString());
 
-        for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+        for (int i : servers) {
             changeServer(i);
             // Encriptação
             String encryptedMessage = null;
@@ -221,10 +260,11 @@ public class HDLT_user extends UserProtocolImplBase{
             int counter = counters.get("server" + i) + 1;
             counters.put("server" + i, counter);
 
-            json.addProperty("counter",counter);
+            JsonObject json2 = json;
+            json2.addProperty("counter",counter);
             try {
                 ivSpec = Utils.generateIv();
-                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
+                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
                 digSig = signMessage(json.toString());
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
@@ -242,12 +282,12 @@ public class HDLT_user extends UserProtocolImplBase{
                 Throwable cause = e.getCause();
                 Status status = ((StatusException) cause).getStatus();
                 if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                    InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+                    /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
                     Key responseKey = null;
                     try{
                         responseKey = bStub.init(initMessage);
                         String base64SymmetricKey = responseKey.getKey();
-                        /*GETS THE USER PASSWORD FROM INPUT*/
+
                         String password = Utils.getPasswordInput();
 
                         byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
@@ -255,9 +295,10 @@ public class HDLT_user extends UserProtocolImplBase{
                     } catch(Exception ex){
                         System.err.println("ERROR: Server connection failed!");
                         return;
-                    }
-                    SubmitLocation();
-                    return;
+                    }*/
+                    init(i);
+                    SubmitLocation(new int[]{i});
+                    //return;
                 }
                 System.err.println(e.getMessage());
                 return;
@@ -280,7 +321,7 @@ public class HDLT_user extends UserProtocolImplBase{
             Boolean bool = convertedResponse.get("Done").getAsBoolean();
 
             if(convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)){
-                System.err.println("ERROR: Wrong mess received");
+                System.err.println("ERROR: Wrong message received");
                 bool = false;
             }
 
@@ -319,22 +360,28 @@ public class HDLT_user extends UserProtocolImplBase{
         return false;
     }
 
-    public static void ObtainLocation(int epoch){
+    public static void ObtainLocation(int[] servers, int epoch){
 
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
         json.addProperty("Epoch",epoch);
 
         // Encriptação
-        for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+        for (int i : servers) {
             changeServer(i);
             String encryptedMessage = null;
             IvParameterSpec ivSpec = null;
             LocationStatus resp = null;
             String digSig = null;
+            int counter = counters.get("server" + i) + 1;
+            counters.put("server" + i, counter);
+
+            JsonObject json2 = json;
+            json2.addProperty("counter",counter);
+
             try {
                 ivSpec = Utils.generateIv();
-                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
+                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
                 digSig = signMessage(json.toString());
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
@@ -350,13 +397,12 @@ public class HDLT_user extends UserProtocolImplBase{
                 Throwable cause = e.getCause();
                 Status status = ((StatusException) cause).getStatus();
                 if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                    InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+                    /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
                     Key responseKey = null;
                     try{
                         responseKey = bStub.init(initMessage);
                         String base64SymmetricKey = responseKey.getKey();
 
-                        /*GETS THE USER PASSWORD FROM INPUT*/
                         String password = Utils.getPasswordInput();
 
                         byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
@@ -364,9 +410,10 @@ public class HDLT_user extends UserProtocolImplBase{
                     } catch(Exception ex){
                         System.err.println("ERROR: Server connection failed!");
                         return;
-                    }
-                    ObtainLocation(epoch);
-                    return;
+                    }*/
+                    init(i);
+                    ObtainLocation(new int[]{i}, epoch);
+                    //return;
                 }
                 System.err.println(e.getMessage());
                 return;
@@ -384,6 +431,16 @@ public class HDLT_user extends UserProtocolImplBase{
             }
             JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
 
+            if(!verifyMessage("server"+i,convertedResponse.toString(),resp.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                return;
+            }
+
+            if(convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)){
+                System.err.println("ERROR: Wrong message received");
+                return;
+            }
+
             int XCoord = convertedResponse.get("XCoord").getAsInt();
             int YCoord = convertedResponse.get("YCoord").getAsInt();
 
@@ -391,18 +448,17 @@ public class HDLT_user extends UserProtocolImplBase{
         }
     }
 
-    public static void requestProofs(int[] epochs){
+    /*Requests the users' proofs to the servers*/
+    public static void requestProofs(int[] servers, int[] epochs){
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
-        JsonArray jsonEpochs = new JsonArray();
+        String eps = null;
         for (int e : epochs) {
-            JsonObject o = new JsonObject();
-            o.addProperty("epoch", e);
-            jsonEpochs.add(o);
+            eps = eps + e + ",";
         }
-        json.add("epochs", jsonEpochs);
+        json.addProperty("epochs", eps);
 
-        for (int i = 1; i <= NUMBER_SERVERS ; i++) {
+        for (int i : servers) {
             changeServer(i);
             // Encriptação
             String encryptedMessage = null;
@@ -427,12 +483,11 @@ public class HDLT_user extends UserProtocolImplBase{
                 Throwable cause = e.getCause();
                 Status status = ((StatusException) cause).getStatus();
                 if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                    InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+                    /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
                     Key responseKey = null;
                     try{
                         responseKey = bStub.init(initMessage);
                         String base64SymmetricKey = responseKey.getKey();
-                        /*GETS THE USER PASSWORD FROM INPUT*/
                         String password = Utils.getPasswordInput();
 
                         byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
@@ -440,9 +495,10 @@ public class HDLT_user extends UserProtocolImplBase{
                     } catch(Exception ex){
                         System.err.println("ERROR: Server connection failed!");
                         return;
-                    }
-                    requestProofs(epochs);
-                    return;
+                    }*/
+                    init(i);
+                    requestProofs(new int[]{i}, epochs);
+                    //return;
                 }
                 System.err.println(e.getMessage());
                 return;
@@ -462,7 +518,19 @@ public class HDLT_user extends UserProtocolImplBase{
 
             JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
 
-            //TODO - processar resposta do servidor
+            if(!verifyMessage("server"+i,convertedResponse.toString(),resp.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                return;
+            }
+
+            if(convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)){
+                System.err.println("ERROR: Wrong message received");
+                return;
+            }
+
+            convertedResponse.remove("counter");
+            System.out.println(convertedResponse.toString());
+
         }
     }
 
@@ -484,7 +552,7 @@ public class HDLT_user extends UserProtocolImplBase{
         return new String(Base64.getEncoder().encode(messageSigned));
     }
 
-    public static int[] splitStrToIntArr(String theStr) {
+    private static int[] splitStrToIntArr(String theStr) {
         String[] strArr = theStr.split(",");
         int[] intArr = new int[strArr.length];
         for (int i = 0; i < strArr.length; i++) {
@@ -493,6 +561,7 @@ public class HDLT_user extends UserProtocolImplBase{
         }
         return intArr;
     }
+
 
     public static void main(String[] args) throws GeneralSecurityException, IOException {
 
@@ -509,42 +578,19 @@ public class HDLT_user extends UserProtocolImplBase{
         user = args[0];
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
-
-
-        Key responseKey = null;
         int i = 0;
+        int[] servers = new int[NUMBER_SERVERS];
         try{
-            Random r = new Random(System.currentTimeMillis());
-            int counter = 0;
-            String digSig = null, message = null;
             for (i = 1; i <= NUMBER_SERVERS ; i++) {
                 changeServer(i);
-
-                /*INITIALIZES COUNTER*/
-                counter = r.nextInt();
-                counters.put("server" + i, counter);
-                message = user + "," + counter;
-                digSig = signMessage(message);
-
-                InitMessage initMessage = InitMessage.newBuilder().setUser(user).setCounter(counter).setDigSig(digSig).build();
-
-                responseKey = bStub.init(initMessage);
-
-                String base64SymmetricKey = responseKey.getKey();
-                counters.put("server"+i, responseKey.getCounter());
-
-                /*GETS THE USER PASSWORD FROM INPUT*/
-                String password = Utils.getPasswordInput();
-
-                byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
-                symmetricKeys.add(Utils.generateSymmetricKey(symmetricKeyBytes));
+                init(i);
+                servers[i-1] = i;
             }
         }catch(Exception e){
             System.err.println("ERROR: Server connection failed!");
             counters.remove("server" + i);
             return;
         }
-
 
         //Instancia de Servidor para os Clients
         Server svc = null;
@@ -587,13 +633,13 @@ public class HDLT_user extends UserProtocolImplBase{
                     case "SubmitLocation":
                     case "s":
                         System.out.println("Submitting Location");
-                        SubmitLocation();
+                        SubmitLocation(servers);
                         break;
                     case "ObtainLocation":
                     case "o":
                         int epoch = Integer.parseInt(line.split(" ")[1]);
                         System.out.println("Obtaining Location of " + user + " at epoch " + epoch);
-                        ObtainLocation(epoch);
+                        ObtainLocation(servers, epoch);
                         break;
                     case "Sleep":
                         Thread.sleep(Integer.parseInt(line.split(" ")[1]));
@@ -607,6 +653,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     case "p":
                         int[] epochs = splitStrToIntArr(line.split(" ")[1]);
                         System.out.println("Requesting My proofs " + currentEpoch);
+                        requestProofs(servers, epochs);
                         break;
                     default:
                         System.out.println("ERROR: Incorrect command");

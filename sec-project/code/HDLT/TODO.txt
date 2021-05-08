@@ -7,13 +7,15 @@ Old TODO:
 - são precisos f proofs para o servidor aceitar - DONE
 - garantir freshness nas mensagens (nounces, counters) - DONE
 - assinatura digital na mensagem init - DONE
-- assinaturas digitais no lado do servidor - TODO
+- assinaturas digitais no lado do servidor - DONE
 - verificação dos counters no lado do servidor - DONE
+- verificar assinaturas digitais no lado do cliente - DONE
+- Terminar verificar counters e digSig em todas as mensagens do user (francisco) - DONE
+
 
 New TODO:
-- dupla chamada aos servidores, no caso de exceções RESOURCE_EXHAUSTED e NOT_FOUND
 - implementar (1,N) Byzantine Regular -  on going
-- Terminar verificar counters e digSig em todas as mensagens do user (francisco)
+
 
 Stage 2:
 - step 1 - DONE
@@ -21,4 +23,3 @@ Stage 2:
 - step 3
 - step 4
 - step 5
-
