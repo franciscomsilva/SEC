@@ -17,7 +17,12 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 
 public class HDLT_Ha {
@@ -138,12 +143,35 @@ public class HDLT_Ha {
         String[] splits = decryptedMessage.split(";");
 
         for(String u : splits){
+            String[] spl = u.split(",");
+
+
             System.out.println("USER: " + u);
         }
         System.out.println("");
     }
 
+    public static boolean verifyMessage(String node, String message, String digSig) {
+        try {
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            byte[] publicKeyBytes = new byte[0];
 
+            publicKeyBytes = Files.readAllBytes(Paths.get("keys/" + node));
+            X509EncodedKeySpec specPublic = new X509EncodedKeySpec(publicKeyBytes);
+            PublicKey publicKey = kf.generatePublic(specPublic);
+
+            if (Utils.verifySignature(message, digSig, publicKey)) {
+                System.out.println("Message Signature Verified!");
+                return true;
+            } else {
+                System.out.println("Message Signature Not Verified!");
+                return false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 
     public static void main(String[] args) throws GeneralSecurityException, IOException {
         readUsers();

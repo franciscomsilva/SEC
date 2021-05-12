@@ -248,6 +248,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     }
                     JsonObject reportObject = new JsonObject();
                     reportObject.addProperty("user",user);
+                    reportObject.addProperty("writerDigSig", request.getDigSig());
                     reportObject.addProperty("coordX",xCoords);
                     reportObject.addProperty("coordY",yCoords);
                     JsonArray proofers_array = new JsonArray();
@@ -477,9 +478,9 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 }
             }
         }
-        JsonObject jo = new JsonObject();
-        jo.addProperty("counter",c+1);
-        data.add(jo);
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("counter",c+1);
+        data.add(jsonObject);
         userCounters.replace(user, c+1);
 
         //Encriptação
@@ -616,7 +617,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
                     for (JsonElement jsonElement : reports) {
                         if (jsonElement.getAsJsonObject().get("coordX").getAsInt() == (xCoords) && jsonElement.getAsJsonObject().get("coordY").getAsInt() == (yCoords)) {
-                            users.add(jsonElement.getAsJsonObject().get("user").getAsString());
+                            users.add(jsonElement.getAsJsonObject().get("user").getAsString() + "," + jsonElement.getAsJsonObject().get("writerDigSIG").getAsString());
                             flagRequest = false;
                         }
                     }
@@ -627,7 +628,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for those coordinates in that epoch!")));
                 return;
             }
-             StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new StringBuilder();
             for(String user : users){
                 sb.append(user + ";");
             }

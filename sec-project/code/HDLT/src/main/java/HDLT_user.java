@@ -1,5 +1,6 @@
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
@@ -24,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import Utils.Utils;
 import userserver.Key;
@@ -43,7 +45,8 @@ public class HDLT_user extends UserProtocolImplBase{
     private static UserServerGrpc.UserServerBlockingStub bStub;
     private static String USERS_CONNECTION_FILE = "files/users_connection.txt";
     private static String MAP_GRID_FILE = "files/map_grid.txt";
-    private static int NUMBER_SERVERS = 2;
+    private static int NUMBER_SERVERS = 4;
+    private static int BYZANTINE_SERVERS = 1;
     private static HashMap<String,Integer> counters = new HashMap<>();
 
     private static HashMap<String,String> UsersMap = new HashMap<>();
@@ -229,7 +232,7 @@ public class HDLT_user extends UserProtocolImplBase{
         symmetricKeys.add(Utils.generateSymmetricKey(symmetricKeyBytes));
     }
 
-    public static void SubmitLocation(int[] servers){
+    public static void SubmitLocation(int[] servers) throws InterruptedException {
 
         JsonArray proofersArray = new JsonArray();
 
@@ -251,99 +254,117 @@ public class HDLT_user extends UserProtocolImplBase{
         json.add("proofers",proofersArray);
         System.out.println(json.toString());
 
+        AtomicInteger cAck = new AtomicInteger(0);
+        ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
         for (int i : servers) {
-            changeServer(i);
-            // Encriptação
-            String encryptedMessage = null;
-            IvParameterSpec ivSpec = null;
-            String digSig = null;
-            int counter = counters.get("server" + i) + 1;
-            counters.put("server" + i, counter);
+            Runnable run = () -> {
+                changeServer(i);
+                // Encriptação
+                String encryptedMessage = null;
+                IvParameterSpec ivSpec = null;
+                String digSig = null;
+                int counter = counters.get("server" + i) + 1;
+                counters.put("server" + i, counter);
 
-            JsonObject json2 = json;
-            json2.addProperty("counter",counter);
-            try {
-                ivSpec = Utils.generateIv();
-                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
-                digSig = signMessage(json.toString());
-            } catch (GeneralSecurityException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
-                    .encodeToString(ivSpec.getIV())).setDigSig(digSig).setUser(user).build();
-            LocationResponse resp = null;
-
-            try {
-                resp = bStub.submitLocationReport(lr);
-            } catch (Exception e) {
-                Throwable cause = e.getCause();
-                Status status = ((StatusException) cause).getStatus();
-                if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                    /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
-                    Key responseKey = null;
-                    try{
-                        responseKey = bStub.init(initMessage);
-                        String base64SymmetricKey = responseKey.getKey();
-
-                        String password = Utils.getPasswordInput();
-
-                        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
-                        symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
-                    } catch(Exception ex){
-                        System.err.println("ERROR: Server connection failed!");
-                        return;
-                    }*/
-                    init(i);
-                    SubmitLocation(new int[]{i});
-                    //return;
+                JsonObject json2 = json;
+                json2.addProperty("counter", counter);
+                try {
+                    ivSpec = Utils.generateIv();
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
+                    digSig = signMessage(json.toString());
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                System.err.println(e.getMessage());
-                return;
-            }
 
-            // Desencriptar -
-            encryptedMessage = resp.getMessage();
-            byte[] iv = Base64.getDecoder().decode(resp.getIv());
-            String decryptedMessage = null;
-            try {
-                decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
-            } catch (GeneralSecurityException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+                LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                        .encodeToString(ivSpec.getIV())).setDigSig(digSig).setUser(user).build();
+                LocationResponse resp = null;
 
-            JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+                try {
+                    resp = bStub.submitLocationReport(lr);
+                } catch (Exception e) {
+                    Throwable cause = e.getCause();
+                    Status status = ((StatusException) cause).getStatus();
+                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                        /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+                        Key responseKey = null;
+                        try{
+                            responseKey = bStub.init(initMessage);
+                            String base64SymmetricKey = responseKey.getKey();
 
-            Boolean bool = convertedResponse.get("Done").getAsBoolean();
+                            String password = Utils.getPasswordInput();
 
-            if(convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)){
-                System.err.println("ERROR: Wrong message received");
-                bool = false;
-            }
+                            byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
+                            symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
+                        } catch(Exception ex){
+                            System.err.println("ERROR: Server connection failed!");
+                            return;
+                        }*/
+                        init(i);
+                        try {
+                            SubmitLocation(new int[]{i});
+                        } catch (InterruptedException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                        //return;
+                    }
+                    System.err.println(e.getMessage());
+                    return;
+                }
 
-            if(!verifyMessage("server"+i,json.toString(),resp.getDigSig())){
-                System.err.println("ERROR: Message not Verified");
-                bool = false;
+                // Desencriptar -
+                encryptedMessage = resp.getMessage();
+                byte[] iv = Base64.getDecoder().decode(resp.getIv());
+                String decryptedMessage = null;
+                try {
+                    decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+                Boolean bool = convertedResponse.get("Done").getAsBoolean();
+
+                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                    System.err.println("ERROR: Wrong message received");
+                    bool = false;
+                }
+
+                if (!verifyMessage("server" + i, json.toString(), resp.getDigSig())) {
+                    System.err.println("ERROR: Message not Verified");
+                    bool = false;
+                }
+                if (bool) {
+                    proofers.clear();
+                    cAck.addAndGet(1);
+                } else {
+                    System.err.println("Submition failed!");
+                }
+            };
+            executorService.execute(run);
+            Thread.sleep(100);
+            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
+                executorService.shutdownNow();
             }
-            if (bool) {
-                proofers.clear();
-            } else {
-                System.err.println("Submittion failed!");
-            }
+        }
+        //verification
+        if ((double) cAck.get() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
+            System.out.println("Submit Location operation was successfully executed");
         }
     }
 
-    public static boolean verifyMessage(String server, String message, String digSig) {
+    public static boolean verifyMessage(String node, String message, String digSig) {
         try {
             KeyFactory kf = KeyFactory.getInstance("RSA");
 
             byte[] publicKeyBytes = new byte[0];
 
-            publicKeyBytes = Files.readAllBytes(Paths.get("keys/" + server));
+            publicKeyBytes = Files.readAllBytes(Paths.get("keys/" + node));
             X509EncodedKeySpec specPublic = new X509EncodedKeySpec(publicKeyBytes);
             PublicKey publicKey = kf.generatePublic(specPublic);
 
@@ -449,7 +470,7 @@ public class HDLT_user extends UserProtocolImplBase{
     }
 
     /*Requests the users' proofs to the servers*/
-    public static void requestProofs(int[] servers, int[] epochs){
+    public static void requestProofs(int[] servers, int[] epochs) throws InterruptedException {
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
         String eps = null;
@@ -458,81 +479,109 @@ public class HDLT_user extends UserProtocolImplBase{
         }
         json.addProperty("epochs", eps);
 
+        ArrayList<JsonObject> serverResponses = new ArrayList<>();
+        ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
         for (int i : servers) {
-            changeServer(i);
-            // Encriptação
-            String encryptedMessage = null;
-            IvParameterSpec ivSpec = null;
-            String digSig = null;
-            try {
-                ivSpec = Utils.generateIv();
-                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
-                digSig = signMessage(json.toString());
-            } catch (GeneralSecurityException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            GetProofs gp = GetProofs.newBuilder().setUser(user).setMessage(encryptedMessage).setIv(Base64.getEncoder()
-                    .encodeToString(ivSpec.getIV())).setDigSig(digSig).build();
-            ProofsResponse resp = null;
-            try {
-                resp = bStub.requestMyProofs(gp);
-            } catch (Exception e) {
-                Throwable cause = e.getCause();
-                Status status = ((StatusException) cause).getStatus();
-                if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                    /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
-                    Key responseKey = null;
-                    try{
-                        responseKey = bStub.init(initMessage);
-                        String base64SymmetricKey = responseKey.getKey();
-                        String password = Utils.getPasswordInput();
-
-                        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
-                        symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
-                    } catch(Exception ex){
-                        System.err.println("ERROR: Server connection failed!");
-                        return;
-                    }*/
-                    init(i);
-                    requestProofs(new int[]{i}, epochs);
-                    //return;
+            Runnable run = () -> {
+                changeServer(i);
+                // Encriptação
+                String encryptedMessage = null;
+                IvParameterSpec ivSpec = null;
+                String digSig = null;
+                try {
+                    ivSpec = Utils.generateIv();
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
+                    digSig = signMessage(json.toString());
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                System.err.println(e.getMessage());
-                return;
+
+                GetProofs gp = GetProofs.newBuilder().setUser(user).setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                        .encodeToString(ivSpec.getIV())).setDigSig(digSig).build();
+                ProofsResponse resp = null;
+                try {
+                    resp = bStub.requestMyProofs(gp);
+                } catch (Exception e) {
+                    Throwable cause = e.getCause();
+                    Status status = ((StatusException) cause).getStatus();
+                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                        /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
+                        Key responseKey = null;
+                        try{
+                            responseKey = bStub.init(initMessage);
+                            String base64SymmetricKey = responseKey.getKey();
+                            String password = Utils.getPasswordInput();
+
+                            byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
+                            symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
+                        } catch(Exception ex){
+                            System.err.println("ERROR: Server connection failed!");
+                            return;
+                        }*/
+                        init(i);
+                        try {
+                            requestProofs(new int[]{i}, epochs);
+                        } catch (InterruptedException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                        //return;
+                    }
+                    System.err.println(e.getMessage());
+                    return;
+                }
+
+                // Desencriptar -
+                encryptedMessage = resp.getMessage();
+                byte[] iv = Base64.getDecoder().decode(resp.getIv());
+                String decryptedMessage = null;
+                try {
+                    decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+                if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
+                    System.err.println("ERROR: Message not Verified");
+                    return;
+                }
+
+                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                    System.err.println("ERROR: Wrong message received");
+                    return;
+                }
+                convertedResponse.remove("counter");
+                serverResponses.add(convertedResponse);
+            };
+            executorService.execute(run);
+            Thread.sleep(100);
+            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
+                executorService.shutdownNow();
             }
-
-            // Desencriptar -
-            encryptedMessage = resp.getMessage();
-            byte[] iv = Base64.getDecoder().decode(resp.getIv());
-            String decryptedMessage = null;
-            try {
-                decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
-            } catch (GeneralSecurityException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
+        }
+        //verification
+        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
+            for (JsonObject jsonObj : serverResponses) {
+                for (JsonElement je : jsonObj.getAsJsonArray()) {
+                    JsonObject jo = je.getAsJsonObject();
+                    String verify = jo.get("user").getAsString() + "," + jo.get("epoch").getAsString() + "," + jo.get("xCoord").getAsString() + "," + jo.get("yCoord").getAsString();
+                    if (verifyMessage(user, verify, jo.get("digSig").getAsString())) {
+                        System.out.println(serverResponses);
+                        // TODO: alterar e apenas fazer 1 print para cada proof
+                    } else {
+                        System.err.println("ERROR: Invalid signature on proof");
+                    }
+                }
             }
-
-            JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
-
-            if(!verifyMessage("server"+i,convertedResponse.toString(),resp.getDigSig())){
-                System.err.println("ERROR: Message not Verified");
-                return;
-            }
-
-            if(convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)){
-                System.err.println("ERROR: Wrong message received");
-                return;
-            }
-
-            convertedResponse.remove("counter");
-            System.out.println(convertedResponse.toString());
-
         }
     }
+
+
 
     private static void changeServer(int n_server){
         //Conexão com o servidor
