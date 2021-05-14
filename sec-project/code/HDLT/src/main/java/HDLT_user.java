@@ -58,6 +58,7 @@ public class HDLT_user extends UserProtocolImplBase{
     private static String user;
     private static int x;
     private static int y;
+    private static String keystore_password;
 
     private static int currentEpoch;
 
@@ -193,39 +194,36 @@ public class HDLT_user extends UserProtocolImplBase{
         }
     }
 
-    public static void init(int i) {
+    public static void init(int server) {
         Random r = new Random(System.currentTimeMillis());
         int counter = 0;
         String digSig = null, message = null;
 
         /*INITIALIZES COUNTER*/
         counter = r.nextInt();
-        counters.put("server" + i, counter);
+        counters.put("server" + server, counter);
         message = user + "," + counter;
         try {
             digSig = signMessage(message);
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         InitMessage initMessage = InitMessage.newBuilder().setUser(user).setCounter(counter).setDigSig(digSig).build();
 
         Key responseKey = bStub.init(initMessage);
 
         String base64SymmetricKey = responseKey.getKey();
         int c = responseKey.getCounter();
-        counters.put("server"+i, c);
+        counters.put("server"+server, c);
 
-        /*GETS THE USER PASSWORD FROM INPUT*/
-        String password = Utils.getPasswordInput();
 
         byte[] symmetricKeyBytes = new byte[0];
         try {
-            symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
+            symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
         } catch (Exception e) {
             e.printStackTrace();
         }
-        if(!verifyMessage("server"+i, base64SymmetricKey+","+c, responseKey.getDigSig())){
+        if(!verifyMessage("server"+server, base64SymmetricKey+","+c, responseKey.getDigSig())){
             System.err.println("ERROR: Message not Verified");
             return;
         }
@@ -294,9 +292,7 @@ public class HDLT_user extends UserProtocolImplBase{
                             responseKey = bStub.init(initMessage);
                             String base64SymmetricKey = responseKey.getKey();
 
-                            String password = Utils.getPasswordInput();
-
-                            byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
+                            byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
                             symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
                         } catch(Exception ex){
                             System.err.println("ERROR: Server connection failed!");
@@ -424,9 +420,8 @@ public class HDLT_user extends UserProtocolImplBase{
                         responseKey = bStub.init(initMessage);
                         String base64SymmetricKey = responseKey.getKey();
 
-                        String password = Utils.getPasswordInput();
 
-                        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
+                        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
                         symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
                     } catch(Exception ex){
                         System.err.println("ERROR: Server connection failed!");
@@ -512,9 +507,8 @@ public class HDLT_user extends UserProtocolImplBase{
                         try{
                             responseKey = bStub.init(initMessage);
                             String base64SymmetricKey = responseKey.getKey();
-                            String password = Utils.getPasswordInput();
 
-                            byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
+                            byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
                             symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
                         } catch(Exception ex){
                             System.err.println("ERROR: Server connection failed!");
@@ -588,7 +582,6 @@ public class HDLT_user extends UserProtocolImplBase{
         String phrase = UsersMap.get("server");
         String svcIP = phrase.split(":")[0];
         int sPort = Integer.parseInt(phrase.split(":")[1]) + n_server;
-
         ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
                 .usePlaintext()
                 .build();
@@ -596,8 +589,7 @@ public class HDLT_user extends UserProtocolImplBase{
     }
 
     private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, UnrecoverableKeyException, KeyStoreException {
-        String password = Utils.getPasswordInput();
-        byte[] messageSigned = Utils.signMessage("keystores/keystore_" + user + ".keystore",password,msgToSign);
+        byte[] messageSigned = Utils.signMessage("keystores/keystore_" + user + ".keystore",keystore_password,msgToSign);
         return new String(Base64.getEncoder().encode(messageSigned));
     }
 
@@ -622,6 +614,9 @@ public class HDLT_user extends UserProtocolImplBase{
             System.err.println("ERROR:Wrong number of arguments");
             return;
         }
+
+        /*GETS THE USER PASSWORD FROM INPUT*/
+        keystore_password = Utils.getPasswordInput();
 
         //Obter o próprio Utilizador bem como o port
         user = args[0];

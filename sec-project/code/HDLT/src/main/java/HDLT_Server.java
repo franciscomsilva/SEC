@@ -47,6 +47,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     private static HashMap<SecretKey, Integer> userSymmetricKeysCounter = new HashMap<SecretKey, Integer>();
     private static HashMap<String, Integer> userCounters = new HashMap<String, Integer>();
 
+    private static String keystore_password;
     private static int n_server = 0;
 
     public static void readUsers() {
@@ -714,8 +715,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     }
 
     private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, UnrecoverableKeyException, KeyStoreException {
-        String password = Utils.getPasswordInput();
-        byte[] messageSigned = Utils.signMessage("keystores/keystore_server" + n_server + ".keystore", password, msgToSign);
+        byte[] messageSigned = Utils.signMessage("keystores/keystore_server" + n_server + ".keystore", keystore_password, msgToSign);
         return new String(Base64.getEncoder().encode(messageSigned));
     }
 
@@ -729,6 +729,10 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
         //readKeysFromFile();
         readReportsFromFile();
+
+
+        /*GETS THE USER PASSWORD FROM INPUT*/
+        keystore_password = Utils.getPasswordInput();
 
         try {
             svc = ServerBuilder

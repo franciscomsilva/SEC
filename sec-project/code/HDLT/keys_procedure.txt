@@ -1,0 +1,18 @@
+- Generate keystore
+keytool -genkey -v -keystore keystore_server1.keystore -alias keystore_server1 -keyalg RSA -sigalg SHA1withRSA -keysize 2048 -validity 10000
+
+
+- Extract public from private  DER FORMAT
+openssl rsa -in server1.key -pubout -outform DER -out server1
+
+- Creates private key and certificate
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:4096 -keyout ../keys/server2.key -out certificate_server2.crt
+
+- Import pkcs12 to keystore
+keytool -v -importkeystore -srckeystore ../pk12/client1.p12 -srcstoretype PKCS12 -destkeystore keystore_client1.keystore -deststoretype JKS
+
+
+- Export pkcs12
+ openssl pkcs12 -export -out client10.p12 -inkey client10.key -in certificate_client10.crt
+
+
