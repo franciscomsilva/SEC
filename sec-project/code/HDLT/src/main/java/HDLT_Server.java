@@ -252,6 +252,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     reportObject.addProperty("writerDigSig", request.getDigSig());
                     reportObject.addProperty("coordX",xCoords);
                     reportObject.addProperty("coordY",yCoords);
+                    reportObject.addProperty("counter", c);
                     JsonArray proofers_array = new JsonArray();
 
                     for(Map.Entry<String,String> entry : proofers.entrySet()){
@@ -472,7 +473,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                             json.addProperty("user", r.getAsJsonObject().get("user").getAsString());
                             json.addProperty("xCoord", r.getAsJsonObject().get("coordX").getAsString());
                             json.addProperty("yCoord", r.getAsJsonObject().get("coordY").getAsString());
-                            json.addProperty("digSig", p.getAsJsonObject().get("digSIG").getAsString());
+                            json.addProperty("prooferDigSig", p.getAsJsonObject().get("digSIG").getAsString());
                             data.add(json);
                         }
                     }

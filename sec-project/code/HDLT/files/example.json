@@ -4,8 +4,9 @@
     "reports": [
       {
         "user": "u3",
-        "coordX": 3,
+        "coordX": 4,
         "coordY": 2,
+        "writerDigSig": "fkdsnhfjds",
         "proofers": [
           {
             "userID": "u5",

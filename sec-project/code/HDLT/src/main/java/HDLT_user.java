@@ -286,18 +286,6 @@ public class HDLT_user extends UserProtocolImplBase{
                     Throwable cause = e.getCause();
                     Status status = ((StatusException) cause).getStatus();
                     if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                        /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
-                        Key responseKey = null;
-                        try{
-                            responseKey = bStub.init(initMessage);
-                            String base64SymmetricKey = responseKey.getKey();
-
-                            byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
-                            symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
-                        } catch(Exception ex){
-                            System.err.println("ERROR: Server connection failed!");
-                            return;
-                        }*/
                         init(i);
                         try {
                             SubmitLocation(new int[]{i});
@@ -414,19 +402,6 @@ public class HDLT_user extends UserProtocolImplBase{
                 Throwable cause = e.getCause();
                 Status status = ((StatusException) cause).getStatus();
                 if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                    /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
-                    Key responseKey = null;
-                    try{
-                        responseKey = bStub.init(initMessage);
-                        String base64SymmetricKey = responseKey.getKey();
-
-
-                        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
-                        symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
-                    } catch(Exception ex){
-                        System.err.println("ERROR: Server connection failed!");
-                        return;
-                    }*/
                     init(i);
                     ObtainLocation(new int[]{i}, epoch);
                     //return;
@@ -502,18 +477,6 @@ public class HDLT_user extends UserProtocolImplBase{
                     Throwable cause = e.getCause();
                     Status status = ((StatusException) cause).getStatus();
                     if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                        /*InitMessage initMessage = InitMessage.newBuilder().setUser(user).build();
-                        Key responseKey = null;
-                        try{
-                            responseKey = bStub.init(initMessage);
-                            String base64SymmetricKey = responseKey.getKey();
-
-                            byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
-                            symmetricKeys.set(i, Utils.generateSymmetricKey(symmetricKeyBytes));
-                        } catch(Exception ex){
-                            System.err.println("ERROR: Server connection failed!");
-                            return;
-                        }*/
                         init(i);
                         try {
                             requestProofs(new int[]{i}, epochs);
@@ -563,6 +526,10 @@ public class HDLT_user extends UserProtocolImplBase{
             for (JsonObject jsonObj : serverResponses) {
                 for (JsonElement je : jsonObj.getAsJsonArray()) {
                     JsonObject jo = je.getAsJsonObject();
+
+                    /*BASTA VERIFICAR A ASSINATURA DO PROOFER PORQUE ESTA FOI ASSINADA TENDO EM CONTA TODOS OS DADOS, COMO USER,
+                    COORDENADAS E EPOCH, LOGO AO VERIFICAR ESTA O UTILIZADOR PODE SABER QUE O SERVIDOR NÃO ALTEROU OS DADOS INICIALMENTE SUBMETIDOS PELO REQUESTER
+                     */
                     String verify = jo.get("user").getAsString() + "," + jo.get("epoch").getAsString() + "," + jo.get("xCoord").getAsString() + "," + jo.get("yCoord").getAsString();
                     if (verifyMessage(user, verify, jo.get("digSig").getAsString())) {
                         System.out.println(serverResponses);
