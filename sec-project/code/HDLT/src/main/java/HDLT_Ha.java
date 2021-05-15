@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import hacontract.*;
+import hacontract.Key;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
@@ -11,6 +12,9 @@ import io.grpc.ServerBuilder;
 import userserver.UserServerGrpc;
 //import userserver.UserServerGrpc;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import java.io.BufferedReader;
@@ -19,9 +23,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
-import java.security.PublicKey;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 
@@ -34,6 +37,9 @@ public class HDLT_Ha {
     private static String user;
 
     private static SecretKey symmetricKey;
+    private static String keystore_password;
+
+
 
 
 
@@ -98,12 +104,20 @@ public class HDLT_Ha {
 
     }
 
-    public static void ObtainUsersAtLocation(int epoch, int xCoords, int yCoords) {
+
+    private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, UnrecoverableKeyException, KeyStoreException {
+        byte[] messageSigned = Utils.signMessage("keystores/keystore_" + user + ".keystore",keystore_password,msgToSign);
+        return new String(Base64.getEncoder().encode(messageSigned));
+    }
+
+    public static void ObtainUsersAtLocation(int epoch, int xCoords, int yCoords) throws NoSuchPaddingException, UnrecoverableKeyException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, KeyStoreException, InvalidKeyException, IOException, InvalidKeySpecException {
 
         JsonObject json =  new JsonObject();
         json.addProperty("epoch", epoch);
         json.addProperty("xCoords", xCoords);
         json.addProperty("yCoords", yCoords);
+        json.addProperty("counter");
+        String messageSigned = signMessage(json.toString());
 
         // Encriptação
         String encryptedMessage = null;
@@ -119,7 +133,7 @@ public class HDLT_Ha {
         }
 
         UserAtLocation ua = UserAtLocation.newBuilder().setIv(Base64.getEncoder()
-                .encodeToString(ivSpec.getIV())).setMessage(encryptedMessage).build();
+                .encodeToString(ivSpec.getIV())).setMessage(encryptedMessage).setDigSig(messageSigned).build();
 
         Users users;
         try{
@@ -176,7 +190,7 @@ public class HDLT_Ha {
 
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
-        user = "user_ha";
+        user = "clientHA";
         String svcIP = phrase.split(":")[0];
         int sPort = Integer.parseInt(phrase.split(":")[1] )+ 50;
         ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
@@ -195,9 +209,9 @@ public class HDLT_Ha {
         String base64SymmetricKey = responseKey.getKey();
 
         /*GETS THE USER PASSWORD FROM INPUT*/
-        String password = Utils.getPasswordInput();
+        keystore_password = Utils.getPasswordInput();
 
-        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",password,base64SymmetricKey);
+        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
         symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
 
         System.out.println("\nAvailable commands:");
