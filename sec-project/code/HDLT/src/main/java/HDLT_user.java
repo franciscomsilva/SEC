@@ -449,19 +449,25 @@ public class HDLT_user extends UserProtocolImplBase{
         }
         json.addProperty("epochs", eps);
 
+
         ArrayList<JsonObject> serverResponses = new ArrayList<>();
         ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
         for (int i : servers) {
             Runnable run = () -> {
                 changeServer(i);
+                int counter = counters.get("server" + i) + 1;
+                counters.put("server" + i, counter);
+                JsonObject json2 = json;
+                json2.addProperty("counter",counter);
+
                 // Encriptação
                 String encryptedMessage = null;
                 IvParameterSpec ivSpec = null;
                 String digSig = null;
                 try {
                     ivSpec = Utils.generateIv();
-                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json.toString(), ivSpec);
-                    digSig = signMessage(json.toString());
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
+                    digSig = signMessage(json2.toString());
                 } catch (GeneralSecurityException e) {
                     e.printStackTrace();
                 } catch (IOException e) {

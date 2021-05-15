@@ -14,23 +14,31 @@ service HAProtocol {
 
 message InitMessage {
     string user = 1;
+    int32 counter = 2;
+    string digSig = 3;
 }
 message Key {
     string key = 1;
+    int32 counter = 2;
+    string digSig = 3;
 }
 message GetLocation {
     string message = 1;
     string iv = 2;
+    string digSig = 3;
 }
 message LocationStatus {
     string message = 1;
     string iv = 2;
+    string digSig = 3;
 }
 message UserAtLocation {
     string message = 1;
     string iv = 2;
+    string digSig = 3;
 }
 message Users {
     string message = 1;
     string iv = 2;
+    string digSig = 3;
 }

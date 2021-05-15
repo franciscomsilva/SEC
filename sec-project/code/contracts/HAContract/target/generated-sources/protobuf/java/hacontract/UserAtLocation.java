@@ -16,9 +16,9 @@ private static final long serialVersionUID = 0L;
     super(builder);
   }
   private UserAtLocation() {
-    xCoord_ = 0;
-    yCoord_ = 0;
-    epoch_ = 0;
+    message_ = "";
+    iv_ = "";
+    digSig_ = "";
   }
 
   @java.lang.Override
@@ -52,19 +52,22 @@ private static final long serialVersionUID = 0L;
             }
             break;
           }
-          case 8: {
+          case 10: {
+            java.lang.String s = input.readStringRequireUtf8();
 
-            xCoord_ = input.readInt32();
+            message_ = s;
             break;
           }
-          case 16: {
+          case 18: {
+            java.lang.String s = input.readStringRequireUtf8();
 
-            yCoord_ = input.readInt32();
+            iv_ = s;
             break;
           }
-          case 24: {
+          case 26: {
+            java.lang.String s = input.readStringRequireUtf8();
 
-            epoch_ = input.readInt32();
+            digSig_ = s;
             break;
           }
         }
@@ -91,31 +94,106 @@ private static final long serialVersionUID = 0L;
             hacontract.UserAtLocation.class, hacontract.UserAtLocation.Builder.class);
   }
 
-  public static final int XCOORD_FIELD_NUMBER = 1;
-  private int xCoord_;
+  public static final int MESSAGE_FIELD_NUMBER = 1;
+  private volatile java.lang.Object message_;
   /**
-   * <code>int32 xCoord = 1;</code>
+   * <code>string message = 1;</code>
    */
-  public int getXCoord() {
-    return xCoord_;
+  public java.lang.String getMessage() {
+    java.lang.Object ref = message_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      message_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string message = 1;</code>
+   */
+  public com.google.protobuf.ByteString
+      getMessageBytes() {
+    java.lang.Object ref = message_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      message_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
   }
 
-  public static final int YCOORD_FIELD_NUMBER = 2;
-  private int yCoord_;
+  public static final int IV_FIELD_NUMBER = 2;
+  private volatile java.lang.Object iv_;
   /**
-   * <code>int32 yCoord = 2;</code>
+   * <code>string iv = 2;</code>
    */
-  public int getYCoord() {
-    return yCoord_;
+  public java.lang.String getIv() {
+    java.lang.Object ref = iv_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      iv_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string iv = 2;</code>
+   */
+  public com.google.protobuf.ByteString
+      getIvBytes() {
+    java.lang.Object ref = iv_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      iv_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
   }
 
-  public static final int EPOCH_FIELD_NUMBER = 3;
-  private int epoch_;
+  public static final int DIGSIG_FIELD_NUMBER = 3;
+  private volatile java.lang.Object digSig_;
   /**
-   * <code>int32 epoch = 3;</code>
+   * <code>string digSig = 3;</code>
    */
-  public int getEpoch() {
-    return epoch_;
+  public java.lang.String getDigSig() {
+    java.lang.Object ref = digSig_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      digSig_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  public com.google.protobuf.ByteString
+      getDigSigBytes() {
+    java.lang.Object ref = digSig_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      digSig_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
   }
 
   private byte memoizedIsInitialized = -1;
@@ -130,14 +208,14 @@ private static final long serialVersionUID = 0L;
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (xCoord_ != 0) {
-      output.writeInt32(1, xCoord_);
+    if (!getMessageBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 1, message_);
     }
-    if (yCoord_ != 0) {
-      output.writeInt32(2, yCoord_);
+    if (!getIvBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 2, iv_);
     }
-    if (epoch_ != 0) {
-      output.writeInt32(3, epoch_);
+    if (!getDigSigBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 3, digSig_);
     }
     unknownFields.writeTo(output);
   }
@@ -147,17 +225,14 @@ private static final long serialVersionUID = 0L;
     if (size != -1) return size;
 
     size = 0;
-    if (xCoord_ != 0) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeInt32Size(1, xCoord_);
+    if (!getMessageBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, message_);
     }
-    if (yCoord_ != 0) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeInt32Size(2, yCoord_);
+    if (!getIvBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(2, iv_);
     }
-    if (epoch_ != 0) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeInt32Size(3, epoch_);
+    if (!getDigSigBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, digSig_);
     }
     size += unknownFields.getSerializedSize();
     memoizedSize = size;
@@ -175,12 +250,12 @@ private static final long serialVersionUID = 0L;
     hacontract.UserAtLocation other = (hacontract.UserAtLocation) obj;
 
     boolean result = true;
-    result = result && (getXCoord()
-        == other.getXCoord());
-    result = result && (getYCoord()
-        == other.getYCoord());
-    result = result && (getEpoch()
-        == other.getEpoch());
+    result = result && getMessage()
+        .equals(other.getMessage());
+    result = result && getIv()
+        .equals(other.getIv());
+    result = result && getDigSig()
+        .equals(other.getDigSig());
     result = result && unknownFields.equals(other.unknownFields);
     return result;
   }
@@ -192,12 +267,12 @@ private static final long serialVersionUID = 0L;
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptor().hashCode();
-    hash = (37 * hash) + XCOORD_FIELD_NUMBER;
-    hash = (53 * hash) + getXCoord();
-    hash = (37 * hash) + YCOORD_FIELD_NUMBER;
-    hash = (53 * hash) + getYCoord();
-    hash = (37 * hash) + EPOCH_FIELD_NUMBER;
-    hash = (53 * hash) + getEpoch();
+    hash = (37 * hash) + MESSAGE_FIELD_NUMBER;
+    hash = (53 * hash) + getMessage().hashCode();
+    hash = (37 * hash) + IV_FIELD_NUMBER;
+    hash = (53 * hash) + getIv().hashCode();
+    hash = (37 * hash) + DIGSIG_FIELD_NUMBER;
+    hash = (53 * hash) + getDigSig().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -327,11 +402,11 @@ private static final long serialVersionUID = 0L;
     }
     public Builder clear() {
       super.clear();
-      xCoord_ = 0;
+      message_ = "";
 
-      yCoord_ = 0;
+      iv_ = "";
 
-      epoch_ = 0;
+      digSig_ = "";
 
       return this;
     }
@@ -355,9 +430,9 @@ private static final long serialVersionUID = 0L;
 
     public hacontract.UserAtLocation buildPartial() {
       hacontract.UserAtLocation result = new hacontract.UserAtLocation(this);
-      result.xCoord_ = xCoord_;
-      result.yCoord_ = yCoord_;
-      result.epoch_ = epoch_;
+      result.message_ = message_;
+      result.iv_ = iv_;
+      result.digSig_ = digSig_;
       onBuilt();
       return result;
     }
@@ -399,14 +474,17 @@ private static final long serialVersionUID = 0L;
 
     public Builder mergeFrom(hacontract.UserAtLocation other) {
       if (other == hacontract.UserAtLocation.getDefaultInstance()) return this;
-      if (other.getXCoord() != 0) {
-        setXCoord(other.getXCoord());
+      if (!other.getMessage().isEmpty()) {
+        message_ = other.message_;
+        onChanged();
       }
-      if (other.getYCoord() != 0) {
-        setYCoord(other.getYCoord());
+      if (!other.getIv().isEmpty()) {
+        iv_ = other.iv_;
+        onChanged();
       }
-      if (other.getEpoch() != 0) {
-        setEpoch(other.getEpoch());
+      if (!other.getDigSig().isEmpty()) {
+        digSig_ = other.digSig_;
+        onChanged();
       }
       this.mergeUnknownFields(other.unknownFields);
       onChanged();
@@ -435,80 +513,209 @@ private static final long serialVersionUID = 0L;
       return this;
     }
 
-    private int xCoord_ ;
+    private java.lang.Object message_ = "";
     /**
-     * <code>int32 xCoord = 1;</code>
+     * <code>string message = 1;</code>
      */
-    public int getXCoord() {
-      return xCoord_;
+    public java.lang.String getMessage() {
+      java.lang.Object ref = message_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        message_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
     }
     /**
-     * <code>int32 xCoord = 1;</code>
+     * <code>string message = 1;</code>
      */
-    public Builder setXCoord(int value) {
-      
-      xCoord_ = value;
+    public com.google.protobuf.ByteString
+        getMessageBytes() {
+      java.lang.Object ref = message_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        message_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string message = 1;</code>
+     */
+    public Builder setMessage(
+        java.lang.String value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  
+      message_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>int32 xCoord = 1;</code>
+     * <code>string message = 1;</code>
      */
-    public Builder clearXCoord() {
+    public Builder clearMessage() {
       
-      xCoord_ = 0;
+      message_ = getDefaultInstance().getMessage();
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string message = 1;</code>
+     */
+    public Builder setMessageBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+      
+      message_ = value;
       onChanged();
       return this;
     }
 
-    private int yCoord_ ;
+    private java.lang.Object iv_ = "";
     /**
-     * <code>int32 yCoord = 2;</code>
+     * <code>string iv = 2;</code>
      */
-    public int getYCoord() {
-      return yCoord_;
+    public java.lang.String getIv() {
+      java.lang.Object ref = iv_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        iv_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
     }
     /**
-     * <code>int32 yCoord = 2;</code>
+     * <code>string iv = 2;</code>
      */
-    public Builder setYCoord(int value) {
-      
-      yCoord_ = value;
+    public com.google.protobuf.ByteString
+        getIvBytes() {
+      java.lang.Object ref = iv_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        iv_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string iv = 2;</code>
+     */
+    public Builder setIv(
+        java.lang.String value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  
+      iv_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>int32 yCoord = 2;</code>
+     * <code>string iv = 2;</code>
      */
-    public Builder clearYCoord() {
+    public Builder clearIv() {
       
-      yCoord_ = 0;
+      iv_ = getDefaultInstance().getIv();
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string iv = 2;</code>
+     */
+    public Builder setIvBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+      
+      iv_ = value;
       onChanged();
       return this;
     }
 
-    private int epoch_ ;
+    private java.lang.Object digSig_ = "";
     /**
-     * <code>int32 epoch = 3;</code>
+     * <code>string digSig = 3;</code>
      */
-    public int getEpoch() {
-      return epoch_;
+    public java.lang.String getDigSig() {
+      java.lang.Object ref = digSig_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        digSig_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
     }
     /**
-     * <code>int32 epoch = 3;</code>
+     * <code>string digSig = 3;</code>
      */
-    public Builder setEpoch(int value) {
-      
-      epoch_ = value;
+    public com.google.protobuf.ByteString
+        getDigSigBytes() {
+      java.lang.Object ref = digSig_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        digSig_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public Builder setDigSig(
+        java.lang.String value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  
+      digSig_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>int32 epoch = 3;</code>
+     * <code>string digSig = 3;</code>
      */
-    public Builder clearEpoch() {
+    public Builder clearDigSig() {
       
-      epoch_ = 0;
+      digSig_ = getDefaultInstance().getDigSig();
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public Builder setDigSigBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+      
+      digSig_ = value;
       onChanged();
       return this;
     }

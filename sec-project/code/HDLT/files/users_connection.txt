@@ -8,4 +8,5 @@ client7,localhost:2007
 client8,localhost:2008
 client9,localhost:2009
 client10,localhost:2010
+clientHA,localhost:2011
 server,localhost:2050

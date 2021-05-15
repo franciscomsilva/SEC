@@ -8,17 +8,32 @@ public interface UserAtLocationOrBuilder extends
     com.google.protobuf.MessageOrBuilder {
 
   /**
-   * <code>int32 xCoord = 1;</code>
+   * <code>string message = 1;</code>
    */
-  int getXCoord();
+  java.lang.String getMessage();
+  /**
+   * <code>string message = 1;</code>
+   */
+  com.google.protobuf.ByteString
+      getMessageBytes();
 
   /**
-   * <code>int32 yCoord = 2;</code>
+   * <code>string iv = 2;</code>
    */
-  int getYCoord();
+  java.lang.String getIv();
+  /**
+   * <code>string iv = 2;</code>
+   */
+  com.google.protobuf.ByteString
+      getIvBytes();
 
   /**
-   * <code>int32 epoch = 3;</code>
+   * <code>string digSig = 3;</code>
    */
-  int getEpoch();
+  java.lang.String getDigSig();
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  com.google.protobuf.ByteString
+      getDigSigBytes();
 }

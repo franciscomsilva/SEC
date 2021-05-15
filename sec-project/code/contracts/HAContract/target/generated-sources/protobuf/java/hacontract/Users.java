@@ -16,7 +16,9 @@ private static final long serialVersionUID = 0L;
     super(builder);
   }
   private Users() {
-    ids_ = com.google.protobuf.LazyStringArrayList.EMPTY;
+    message_ = "";
+    iv_ = "";
+    digSig_ = "";
   }
 
   @java.lang.Override
@@ -52,11 +54,20 @@ private static final long serialVersionUID = 0L;
           }
           case 10: {
             java.lang.String s = input.readStringRequireUtf8();
-            if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-              ids_ = new com.google.protobuf.LazyStringArrayList();
-              mutable_bitField0_ |= 0x00000001;
-            }
-            ids_.add(s);
+
+            message_ = s;
+            break;
+          }
+          case 18: {
+            java.lang.String s = input.readStringRequireUtf8();
+
+            iv_ = s;
+            break;
+          }
+          case 26: {
+            java.lang.String s = input.readStringRequireUtf8();
+
+            digSig_ = s;
             break;
           }
         }
@@ -67,9 +78,6 @@ private static final long serialVersionUID = 0L;
       throw new com.google.protobuf.InvalidProtocolBufferException(
           e).setUnfinishedMessage(this);
     } finally {
-      if (((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-        ids_ = ids_.getUnmodifiableView();
-      }
       this.unknownFields = unknownFields.build();
       makeExtensionsImmutable();
     }
@@ -86,33 +94,106 @@ private static final long serialVersionUID = 0L;
             hacontract.Users.class, hacontract.Users.Builder.class);
   }
 
-  public static final int IDS_FIELD_NUMBER = 1;
-  private com.google.protobuf.LazyStringList ids_;
+  public static final int MESSAGE_FIELD_NUMBER = 1;
+  private volatile java.lang.Object message_;
   /**
-   * <code>repeated string ids = 1;</code>
+   * <code>string message = 1;</code>
    */
-  public com.google.protobuf.ProtocolStringList
-      getIdsList() {
-    return ids_;
+  public java.lang.String getMessage() {
+    java.lang.Object ref = message_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      message_ = s;
+      return s;
+    }
   }
   /**
-   * <code>repeated string ids = 1;</code>
-   */
-  public int getIdsCount() {
-    return ids_.size();
-  }
-  /**
-   * <code>repeated string ids = 1;</code>
-   */
-  public java.lang.String getIds(int index) {
-    return ids_.get(index);
-  }
-  /**
-   * <code>repeated string ids = 1;</code>
+   * <code>string message = 1;</code>
    */
   public com.google.protobuf.ByteString
-      getIdsBytes(int index) {
-    return ids_.getByteString(index);
+      getMessageBytes() {
+    java.lang.Object ref = message_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      message_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
+  public static final int IV_FIELD_NUMBER = 2;
+  private volatile java.lang.Object iv_;
+  /**
+   * <code>string iv = 2;</code>
+   */
+  public java.lang.String getIv() {
+    java.lang.Object ref = iv_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      iv_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string iv = 2;</code>
+   */
+  public com.google.protobuf.ByteString
+      getIvBytes() {
+    java.lang.Object ref = iv_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      iv_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
+  }
+
+  public static final int DIGSIG_FIELD_NUMBER = 3;
+  private volatile java.lang.Object digSig_;
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  public java.lang.String getDigSig() {
+    java.lang.Object ref = digSig_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      digSig_ = s;
+      return s;
+    }
+  }
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  public com.google.protobuf.ByteString
+      getDigSigBytes() {
+    java.lang.Object ref = digSig_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      digSig_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
   }
 
   private byte memoizedIsInitialized = -1;
@@ -127,8 +208,14 @@ private static final long serialVersionUID = 0L;
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    for (int i = 0; i < ids_.size(); i++) {
-      com.google.protobuf.GeneratedMessageV3.writeString(output, 1, ids_.getRaw(i));
+    if (!getMessageBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 1, message_);
+    }
+    if (!getIvBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 2, iv_);
+    }
+    if (!getDigSigBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 3, digSig_);
     }
     unknownFields.writeTo(output);
   }
@@ -138,13 +225,14 @@ private static final long serialVersionUID = 0L;
     if (size != -1) return size;
 
     size = 0;
-    {
-      int dataSize = 0;
-      for (int i = 0; i < ids_.size(); i++) {
-        dataSize += computeStringSizeNoTag(ids_.getRaw(i));
-      }
-      size += dataSize;
-      size += 1 * getIdsList().size();
+    if (!getMessageBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, message_);
+    }
+    if (!getIvBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(2, iv_);
+    }
+    if (!getDigSigBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, digSig_);
     }
     size += unknownFields.getSerializedSize();
     memoizedSize = size;
@@ -162,8 +250,12 @@ private static final long serialVersionUID = 0L;
     hacontract.Users other = (hacontract.Users) obj;
 
     boolean result = true;
-    result = result && getIdsList()
-        .equals(other.getIdsList());
+    result = result && getMessage()
+        .equals(other.getMessage());
+    result = result && getIv()
+        .equals(other.getIv());
+    result = result && getDigSig()
+        .equals(other.getDigSig());
     result = result && unknownFields.equals(other.unknownFields);
     return result;
   }
@@ -175,10 +267,12 @@ private static final long serialVersionUID = 0L;
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptor().hashCode();
-    if (getIdsCount() > 0) {
-      hash = (37 * hash) + IDS_FIELD_NUMBER;
-      hash = (53 * hash) + getIdsList().hashCode();
-    }
+    hash = (37 * hash) + MESSAGE_FIELD_NUMBER;
+    hash = (53 * hash) + getMessage().hashCode();
+    hash = (37 * hash) + IV_FIELD_NUMBER;
+    hash = (53 * hash) + getIv().hashCode();
+    hash = (37 * hash) + DIGSIG_FIELD_NUMBER;
+    hash = (53 * hash) + getDigSig().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -308,8 +402,12 @@ private static final long serialVersionUID = 0L;
     }
     public Builder clear() {
       super.clear();
-      ids_ = com.google.protobuf.LazyStringArrayList.EMPTY;
-      bitField0_ = (bitField0_ & ~0x00000001);
+      message_ = "";
+
+      iv_ = "";
+
+      digSig_ = "";
+
       return this;
     }
 
@@ -332,12 +430,9 @@ private static final long serialVersionUID = 0L;
 
     public hacontract.Users buildPartial() {
       hacontract.Users result = new hacontract.Users(this);
-      int from_bitField0_ = bitField0_;
-      if (((bitField0_ & 0x00000001) == 0x00000001)) {
-        ids_ = ids_.getUnmodifiableView();
-        bitField0_ = (bitField0_ & ~0x00000001);
-      }
-      result.ids_ = ids_;
+      result.message_ = message_;
+      result.iv_ = iv_;
+      result.digSig_ = digSig_;
       onBuilt();
       return result;
     }
@@ -379,14 +474,16 @@ private static final long serialVersionUID = 0L;
 
     public Builder mergeFrom(hacontract.Users other) {
       if (other == hacontract.Users.getDefaultInstance()) return this;
-      if (!other.ids_.isEmpty()) {
-        if (ids_.isEmpty()) {
-          ids_ = other.ids_;
-          bitField0_ = (bitField0_ & ~0x00000001);
-        } else {
-          ensureIdsIsMutable();
-          ids_.addAll(other.ids_);
-        }
+      if (!other.getMessage().isEmpty()) {
+        message_ = other.message_;
+        onChanged();
+      }
+      if (!other.getIv().isEmpty()) {
+        iv_ = other.iv_;
+        onChanged();
+      }
+      if (!other.getDigSig().isEmpty()) {
+        digSig_ = other.digSig_;
         onChanged();
       }
       this.mergeUnknownFields(other.unknownFields);
@@ -415,98 +512,210 @@ private static final long serialVersionUID = 0L;
       }
       return this;
     }
-    private int bitField0_;
 
-    private com.google.protobuf.LazyStringList ids_ = com.google.protobuf.LazyStringArrayList.EMPTY;
-    private void ensureIdsIsMutable() {
-      if (!((bitField0_ & 0x00000001) == 0x00000001)) {
-        ids_ = new com.google.protobuf.LazyStringArrayList(ids_);
-        bitField0_ |= 0x00000001;
-       }
-    }
+    private java.lang.Object message_ = "";
     /**
-     * <code>repeated string ids = 1;</code>
+     * <code>string message = 1;</code>
      */
-    public com.google.protobuf.ProtocolStringList
-        getIdsList() {
-      return ids_.getUnmodifiableView();
+    public java.lang.String getMessage() {
+      java.lang.Object ref = message_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        message_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
     }
     /**
-     * <code>repeated string ids = 1;</code>
-     */
-    public int getIdsCount() {
-      return ids_.size();
-    }
-    /**
-     * <code>repeated string ids = 1;</code>
-     */
-    public java.lang.String getIds(int index) {
-      return ids_.get(index);
-    }
-    /**
-     * <code>repeated string ids = 1;</code>
+     * <code>string message = 1;</code>
      */
     public com.google.protobuf.ByteString
-        getIdsBytes(int index) {
-      return ids_.getByteString(index);
+        getMessageBytes() {
+      java.lang.Object ref = message_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        message_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
     }
     /**
-     * <code>repeated string ids = 1;</code>
+     * <code>string message = 1;</code>
      */
-    public Builder setIds(
-        int index, java.lang.String value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  ensureIdsIsMutable();
-      ids_.set(index, value);
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>repeated string ids = 1;</code>
-     */
-    public Builder addIds(
+    public Builder setMessage(
         java.lang.String value) {
       if (value == null) {
     throw new NullPointerException();
   }
-  ensureIdsIsMutable();
-      ids_.add(value);
+  
+      message_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>repeated string ids = 1;</code>
+     * <code>string message = 1;</code>
      */
-    public Builder addAllIds(
-        java.lang.Iterable<java.lang.String> values) {
-      ensureIdsIsMutable();
-      com.google.protobuf.AbstractMessageLite.Builder.addAll(
-          values, ids_);
+    public Builder clearMessage() {
+      
+      message_ = getDefaultInstance().getMessage();
       onChanged();
       return this;
     }
     /**
-     * <code>repeated string ids = 1;</code>
+     * <code>string message = 1;</code>
      */
-    public Builder clearIds() {
-      ids_ = com.google.protobuf.LazyStringArrayList.EMPTY;
-      bitField0_ = (bitField0_ & ~0x00000001);
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>repeated string ids = 1;</code>
-     */
-    public Builder addIdsBytes(
+    public Builder setMessageBytes(
         com.google.protobuf.ByteString value) {
       if (value == null) {
     throw new NullPointerException();
   }
   checkByteStringIsUtf8(value);
-      ensureIdsIsMutable();
-      ids_.add(value);
+      
+      message_ = value;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object iv_ = "";
+    /**
+     * <code>string iv = 2;</code>
+     */
+    public java.lang.String getIv() {
+      java.lang.Object ref = iv_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        iv_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string iv = 2;</code>
+     */
+    public com.google.protobuf.ByteString
+        getIvBytes() {
+      java.lang.Object ref = iv_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        iv_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string iv = 2;</code>
+     */
+    public Builder setIv(
+        java.lang.String value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  
+      iv_ = value;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string iv = 2;</code>
+     */
+    public Builder clearIv() {
+      
+      iv_ = getDefaultInstance().getIv();
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string iv = 2;</code>
+     */
+    public Builder setIvBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+      
+      iv_ = value;
+      onChanged();
+      return this;
+    }
+
+    private java.lang.Object digSig_ = "";
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public java.lang.String getDigSig() {
+      java.lang.Object ref = digSig_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        digSig_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public com.google.protobuf.ByteString
+        getDigSigBytes() {
+      java.lang.Object ref = digSig_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        digSig_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public Builder setDigSig(
+        java.lang.String value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  
+      digSig_ = value;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public Builder clearDigSig() {
+      
+      digSig_ = getDefaultInstance().getDigSig();
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>string digSig = 3;</code>
+     */
+    public Builder setDigSigBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+      
+      digSig_ = value;
       onChanged();
       return this;
     }

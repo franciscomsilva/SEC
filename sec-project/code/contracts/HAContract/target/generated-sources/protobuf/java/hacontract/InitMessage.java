@@ -4,20 +4,20 @@
 package hacontract;
 
 /**
- * Protobuf type {@code hacontract.GetLocation}
+ * Protobuf type {@code hacontract.InitMessage}
  */
-public  final class GetLocation extends
+public  final class InitMessage extends
     com.google.protobuf.GeneratedMessageV3 implements
-    // @@protoc_insertion_point(message_implements:hacontract.GetLocation)
-    GetLocationOrBuilder {
+    // @@protoc_insertion_point(message_implements:hacontract.InitMessage)
+    InitMessageOrBuilder {
 private static final long serialVersionUID = 0L;
-  // Use GetLocation.newBuilder() to construct.
-  private GetLocation(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+  // Use InitMessage.newBuilder() to construct.
+  private InitMessage(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
     super(builder);
   }
-  private GetLocation() {
-    message_ = "";
-    iv_ = "";
+  private InitMessage() {
+    user_ = "";
+    counter_ = 0;
     digSig_ = "";
   }
 
@@ -26,7 +26,7 @@ private static final long serialVersionUID = 0L;
   getUnknownFields() {
     return this.unknownFields;
   }
-  private GetLocation(
+  private InitMessage(
       com.google.protobuf.CodedInputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
@@ -55,13 +55,12 @@ private static final long serialVersionUID = 0L;
           case 10: {
             java.lang.String s = input.readStringRequireUtf8();
 
-            message_ = s;
+            user_ = s;
             break;
           }
-          case 18: {
-            java.lang.String s = input.readStringRequireUtf8();
+          case 16: {
 
-            iv_ = s;
+            counter_ = input.readInt32();
             break;
           }
           case 26: {
@@ -84,82 +83,57 @@ private static final long serialVersionUID = 0L;
   }
   public static final com.google.protobuf.Descriptors.Descriptor
       getDescriptor() {
-    return hacontract.HAContract.internal_static_hacontract_GetLocation_descriptor;
+    return hacontract.HAContract.internal_static_hacontract_InitMessage_descriptor;
   }
 
   protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internalGetFieldAccessorTable() {
-    return hacontract.HAContract.internal_static_hacontract_GetLocation_fieldAccessorTable
+    return hacontract.HAContract.internal_static_hacontract_InitMessage_fieldAccessorTable
         .ensureFieldAccessorsInitialized(
-            hacontract.GetLocation.class, hacontract.GetLocation.Builder.class);
+            hacontract.InitMessage.class, hacontract.InitMessage.Builder.class);
   }
 
-  public static final int MESSAGE_FIELD_NUMBER = 1;
-  private volatile java.lang.Object message_;
+  public static final int USER_FIELD_NUMBER = 1;
+  private volatile java.lang.Object user_;
   /**
-   * <code>string message = 1;</code>
+   * <code>string user = 1;</code>
    */
-  public java.lang.String getMessage() {
-    java.lang.Object ref = message_;
+  public java.lang.String getUser() {
+    java.lang.Object ref = user_;
     if (ref instanceof java.lang.String) {
       return (java.lang.String) ref;
     } else {
       com.google.protobuf.ByteString bs = 
           (com.google.protobuf.ByteString) ref;
       java.lang.String s = bs.toStringUtf8();
-      message_ = s;
+      user_ = s;
       return s;
     }
   }
   /**
-   * <code>string message = 1;</code>
+   * <code>string user = 1;</code>
    */
   public com.google.protobuf.ByteString
-      getMessageBytes() {
-    java.lang.Object ref = message_;
+      getUserBytes() {
+    java.lang.Object ref = user_;
     if (ref instanceof java.lang.String) {
       com.google.protobuf.ByteString b = 
           com.google.protobuf.ByteString.copyFromUtf8(
               (java.lang.String) ref);
-      message_ = b;
+      user_ = b;
       return b;
     } else {
       return (com.google.protobuf.ByteString) ref;
     }
   }
 
-  public static final int IV_FIELD_NUMBER = 2;
-  private volatile java.lang.Object iv_;
+  public static final int COUNTER_FIELD_NUMBER = 2;
+  private int counter_;
   /**
-   * <code>string iv = 2;</code>
+   * <code>int32 counter = 2;</code>
    */
-  public java.lang.String getIv() {
-    java.lang.Object ref = iv_;
-    if (ref instanceof java.lang.String) {
-      return (java.lang.String) ref;
-    } else {
-      com.google.protobuf.ByteString bs = 
-          (com.google.protobuf.ByteString) ref;
-      java.lang.String s = bs.toStringUtf8();
-      iv_ = s;
-      return s;
-    }
-  }
-  /**
-   * <code>string iv = 2;</code>
-   */
-  public com.google.protobuf.ByteString
-      getIvBytes() {
-    java.lang.Object ref = iv_;
-    if (ref instanceof java.lang.String) {
-      com.google.protobuf.ByteString b = 
-          com.google.protobuf.ByteString.copyFromUtf8(
-              (java.lang.String) ref);
-      iv_ = b;
-      return b;
-    } else {
-      return (com.google.protobuf.ByteString) ref;
-    }
+  public int getCounter() {
+    return counter_;
   }
 
   public static final int DIGSIG_FIELD_NUMBER = 3;
@@ -208,11 +182,11 @@ private static final long serialVersionUID = 0L;
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (!getMessageBytes().isEmpty()) {
-      com.google.protobuf.GeneratedMessageV3.writeString(output, 1, message_);
+    if (!getUserBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 1, user_);
     }
-    if (!getIvBytes().isEmpty()) {
-      com.google.protobuf.GeneratedMessageV3.writeString(output, 2, iv_);
+    if (counter_ != 0) {
+      output.writeInt32(2, counter_);
     }
     if (!getDigSigBytes().isEmpty()) {
       com.google.protobuf.GeneratedMessageV3.writeString(output, 3, digSig_);
@@ -225,11 +199,12 @@ private static final long serialVersionUID = 0L;
     if (size != -1) return size;
 
     size = 0;
-    if (!getMessageBytes().isEmpty()) {
-      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, message_);
+    if (!getUserBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, user_);
     }
-    if (!getIvBytes().isEmpty()) {
-      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(2, iv_);
+    if (counter_ != 0) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeInt32Size(2, counter_);
     }
     if (!getDigSigBytes().isEmpty()) {
       size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, digSig_);
@@ -244,16 +219,16 @@ private static final long serialVersionUID = 0L;
     if (obj == this) {
      return true;
     }
-    if (!(obj instanceof hacontract.GetLocation)) {
+    if (!(obj instanceof hacontract.InitMessage)) {
       return super.equals(obj);
     }
-    hacontract.GetLocation other = (hacontract.GetLocation) obj;
+    hacontract.InitMessage other = (hacontract.InitMessage) obj;
 
     boolean result = true;
-    result = result && getMessage()
-        .equals(other.getMessage());
-    result = result && getIv()
-        .equals(other.getIv());
+    result = result && getUser()
+        .equals(other.getUser());
+    result = result && (getCounter()
+        == other.getCounter());
     result = result && getDigSig()
         .equals(other.getDigSig());
     result = result && unknownFields.equals(other.unknownFields);
@@ -267,10 +242,10 @@ private static final long serialVersionUID = 0L;
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptor().hashCode();
-    hash = (37 * hash) + MESSAGE_FIELD_NUMBER;
-    hash = (53 * hash) + getMessage().hashCode();
-    hash = (37 * hash) + IV_FIELD_NUMBER;
-    hash = (53 * hash) + getIv().hashCode();
+    hash = (37 * hash) + USER_FIELD_NUMBER;
+    hash = (53 * hash) + getUser().hashCode();
+    hash = (37 * hash) + COUNTER_FIELD_NUMBER;
+    hash = (53 * hash) + getCounter();
     hash = (37 * hash) + DIGSIG_FIELD_NUMBER;
     hash = (53 * hash) + getDigSig().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
@@ -278,69 +253,69 @@ private static final long serialVersionUID = 0L;
     return hash;
   }
 
-  public static hacontract.GetLocation parseFrom(
+  public static hacontract.InitMessage parseFrom(
       java.nio.ByteBuffer data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static hacontract.GetLocation parseFrom(
+  public static hacontract.InitMessage parseFrom(
       java.nio.ByteBuffer data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static hacontract.GetLocation parseFrom(
+  public static hacontract.InitMessage parseFrom(
       com.google.protobuf.ByteString data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static hacontract.GetLocation parseFrom(
+  public static hacontract.InitMessage parseFrom(
       com.google.protobuf.ByteString data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static hacontract.GetLocation parseFrom(byte[] data)
+  public static hacontract.InitMessage parseFrom(byte[] data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static hacontract.GetLocation parseFrom(
+  public static hacontract.InitMessage parseFrom(
       byte[] data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static hacontract.GetLocation parseFrom(java.io.InputStream input)
+  public static hacontract.InitMessage parseFrom(java.io.InputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input);
   }
-  public static hacontract.GetLocation parseFrom(
+  public static hacontract.InitMessage parseFrom(
       java.io.InputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input, extensionRegistry);
   }
-  public static hacontract.GetLocation parseDelimitedFrom(java.io.InputStream input)
+  public static hacontract.InitMessage parseDelimitedFrom(java.io.InputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseDelimitedWithIOException(PARSER, input);
   }
-  public static hacontract.GetLocation parseDelimitedFrom(
+  public static hacontract.InitMessage parseDelimitedFrom(
       java.io.InputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
   }
-  public static hacontract.GetLocation parseFrom(
+  public static hacontract.InitMessage parseFrom(
       com.google.protobuf.CodedInputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input);
   }
-  public static hacontract.GetLocation parseFrom(
+  public static hacontract.InitMessage parseFrom(
       com.google.protobuf.CodedInputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
@@ -352,7 +327,7 @@ private static final long serialVersionUID = 0L;
   public static Builder newBuilder() {
     return DEFAULT_INSTANCE.toBuilder();
   }
-  public static Builder newBuilder(hacontract.GetLocation prototype) {
+  public static Builder newBuilder(hacontract.InitMessage prototype) {
     return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
   }
   public Builder toBuilder() {
@@ -367,25 +342,25 @@ private static final long serialVersionUID = 0L;
     return builder;
   }
   /**
-   * Protobuf type {@code hacontract.GetLocation}
+   * Protobuf type {@code hacontract.InitMessage}
    */
   public static final class Builder extends
       com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
-      // @@protoc_insertion_point(builder_implements:hacontract.GetLocation)
-      hacontract.GetLocationOrBuilder {
+      // @@protoc_insertion_point(builder_implements:hacontract.InitMessage)
+      hacontract.InitMessageOrBuilder {
     public static final com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
-      return hacontract.HAContract.internal_static_hacontract_GetLocation_descriptor;
+      return hacontract.HAContract.internal_static_hacontract_InitMessage_descriptor;
     }
 
     protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
         internalGetFieldAccessorTable() {
-      return hacontract.HAContract.internal_static_hacontract_GetLocation_fieldAccessorTable
+      return hacontract.HAContract.internal_static_hacontract_InitMessage_fieldAccessorTable
           .ensureFieldAccessorsInitialized(
-              hacontract.GetLocation.class, hacontract.GetLocation.Builder.class);
+              hacontract.InitMessage.class, hacontract.InitMessage.Builder.class);
     }
 
-    // Construct using hacontract.GetLocation.newBuilder()
+    // Construct using hacontract.InitMessage.newBuilder()
     private Builder() {
       maybeForceBuilderInitialization();
     }
@@ -402,9 +377,9 @@ private static final long serialVersionUID = 0L;
     }
     public Builder clear() {
       super.clear();
-      message_ = "";
+      user_ = "";
 
-      iv_ = "";
+      counter_ = 0;
 
       digSig_ = "";
 
@@ -413,25 +388,25 @@ private static final long serialVersionUID = 0L;
 
     public com.google.protobuf.Descriptors.Descriptor
         getDescriptorForType() {
-      return hacontract.HAContract.internal_static_hacontract_GetLocation_descriptor;
+      return hacontract.HAContract.internal_static_hacontract_InitMessage_descriptor;
     }
 
-    public hacontract.GetLocation getDefaultInstanceForType() {
-      return hacontract.GetLocation.getDefaultInstance();
+    public hacontract.InitMessage getDefaultInstanceForType() {
+      return hacontract.InitMessage.getDefaultInstance();
     }
 
-    public hacontract.GetLocation build() {
-      hacontract.GetLocation result = buildPartial();
+    public hacontract.InitMessage build() {
+      hacontract.InitMessage result = buildPartial();
       if (!result.isInitialized()) {
         throw newUninitializedMessageException(result);
       }
       return result;
     }
 
-    public hacontract.GetLocation buildPartial() {
-      hacontract.GetLocation result = new hacontract.GetLocation(this);
-      result.message_ = message_;
-      result.iv_ = iv_;
+    public hacontract.InitMessage buildPartial() {
+      hacontract.InitMessage result = new hacontract.InitMessage(this);
+      result.user_ = user_;
+      result.counter_ = counter_;
       result.digSig_ = digSig_;
       onBuilt();
       return result;
@@ -464,23 +439,22 @@ private static final long serialVersionUID = 0L;
       return (Builder) super.addRepeatedField(field, value);
     }
     public Builder mergeFrom(com.google.protobuf.Message other) {
-      if (other instanceof hacontract.GetLocation) {
-        return mergeFrom((hacontract.GetLocation)other);
+      if (other instanceof hacontract.InitMessage) {
+        return mergeFrom((hacontract.InitMessage)other);
       } else {
         super.mergeFrom(other);
         return this;
       }
     }
 
-    public Builder mergeFrom(hacontract.GetLocation other) {
-      if (other == hacontract.GetLocation.getDefaultInstance()) return this;
-      if (!other.getMessage().isEmpty()) {
-        message_ = other.message_;
+    public Builder mergeFrom(hacontract.InitMessage other) {
+      if (other == hacontract.InitMessage.getDefaultInstance()) return this;
+      if (!other.getUser().isEmpty()) {
+        user_ = other.user_;
         onChanged();
       }
-      if (!other.getIv().isEmpty()) {
-        iv_ = other.iv_;
-        onChanged();
+      if (other.getCounter() != 0) {
+        setCounter(other.getCounter());
       }
       if (!other.getDigSig().isEmpty()) {
         digSig_ = other.digSig_;
@@ -499,11 +473,11 @@ private static final long serialVersionUID = 0L;
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      hacontract.GetLocation parsedMessage = null;
+      hacontract.InitMessage parsedMessage = null;
       try {
         parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
       } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-        parsedMessage = (hacontract.GetLocation) e.getUnfinishedMessage();
+        parsedMessage = (hacontract.InitMessage) e.getUnfinishedMessage();
         throw e.unwrapIOException();
       } finally {
         if (parsedMessage != null) {
@@ -513,140 +487,97 @@ private static final long serialVersionUID = 0L;
       return this;
     }
 
-    private java.lang.Object message_ = "";
+    private java.lang.Object user_ = "";
     /**
-     * <code>string message = 1;</code>
+     * <code>string user = 1;</code>
      */
-    public java.lang.String getMessage() {
-      java.lang.Object ref = message_;
+    public java.lang.String getUser() {
+      java.lang.Object ref = user_;
       if (!(ref instanceof java.lang.String)) {
         com.google.protobuf.ByteString bs =
             (com.google.protobuf.ByteString) ref;
         java.lang.String s = bs.toStringUtf8();
-        message_ = s;
+        user_ = s;
         return s;
       } else {
         return (java.lang.String) ref;
       }
     }
     /**
-     * <code>string message = 1;</code>
+     * <code>string user = 1;</code>
      */
     public com.google.protobuf.ByteString
-        getMessageBytes() {
-      java.lang.Object ref = message_;
+        getUserBytes() {
+      java.lang.Object ref = user_;
       if (ref instanceof String) {
         com.google.protobuf.ByteString b = 
             com.google.protobuf.ByteString.copyFromUtf8(
                 (java.lang.String) ref);
-        message_ = b;
+        user_ = b;
         return b;
       } else {
         return (com.google.protobuf.ByteString) ref;
       }
     }
     /**
-     * <code>string message = 1;</code>
+     * <code>string user = 1;</code>
      */
-    public Builder setMessage(
+    public Builder setUser(
         java.lang.String value) {
       if (value == null) {
     throw new NullPointerException();
   }
   
-      message_ = value;
+      user_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>string message = 1;</code>
+     * <code>string user = 1;</code>
      */
-    public Builder clearMessage() {
+    public Builder clearUser() {
       
-      message_ = getDefaultInstance().getMessage();
+      user_ = getDefaultInstance().getUser();
       onChanged();
       return this;
     }
     /**
-     * <code>string message = 1;</code>
+     * <code>string user = 1;</code>
      */
-    public Builder setMessageBytes(
+    public Builder setUserBytes(
         com.google.protobuf.ByteString value) {
       if (value == null) {
     throw new NullPointerException();
   }
   checkByteStringIsUtf8(value);
       
-      message_ = value;
+      user_ = value;
       onChanged();
       return this;
     }
 
-    private java.lang.Object iv_ = "";
+    private int counter_ ;
     /**
-     * <code>string iv = 2;</code>
+     * <code>int32 counter = 2;</code>
      */
-    public java.lang.String getIv() {
-      java.lang.Object ref = iv_;
-      if (!(ref instanceof java.lang.String)) {
-        com.google.protobuf.ByteString bs =
-            (com.google.protobuf.ByteString) ref;
-        java.lang.String s = bs.toStringUtf8();
-        iv_ = s;
-        return s;
-      } else {
-        return (java.lang.String) ref;
-      }
+    public int getCounter() {
+      return counter_;
     }
     /**
-     * <code>string iv = 2;</code>
+     * <code>int32 counter = 2;</code>
      */
-    public com.google.protobuf.ByteString
-        getIvBytes() {
-      java.lang.Object ref = iv_;
-      if (ref instanceof String) {
-        com.google.protobuf.ByteString b = 
-            com.google.protobuf.ByteString.copyFromUtf8(
-                (java.lang.String) ref);
-        iv_ = b;
-        return b;
-      } else {
-        return (com.google.protobuf.ByteString) ref;
-      }
-    }
-    /**
-     * <code>string iv = 2;</code>
-     */
-    public Builder setIv(
-        java.lang.String value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  
-      iv_ = value;
+    public Builder setCounter(int value) {
+      
+      counter_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>string iv = 2;</code>
+     * <code>int32 counter = 2;</code>
      */
-    public Builder clearIv() {
+    public Builder clearCounter() {
       
-      iv_ = getDefaultInstance().getIv();
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>string iv = 2;</code>
-     */
-    public Builder setIvBytes(
-        com.google.protobuf.ByteString value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  checkByteStringIsUtf8(value);
-      
-      iv_ = value;
+      counter_ = 0;
       onChanged();
       return this;
     }
@@ -730,39 +661,39 @@ private static final long serialVersionUID = 0L;
     }
 
 
-    // @@protoc_insertion_point(builder_scope:hacontract.GetLocation)
+    // @@protoc_insertion_point(builder_scope:hacontract.InitMessage)
   }
 
-  // @@protoc_insertion_point(class_scope:hacontract.GetLocation)
-  private static final hacontract.GetLocation DEFAULT_INSTANCE;
+  // @@protoc_insertion_point(class_scope:hacontract.InitMessage)
+  private static final hacontract.InitMessage DEFAULT_INSTANCE;
   static {
-    DEFAULT_INSTANCE = new hacontract.GetLocation();
+    DEFAULT_INSTANCE = new hacontract.InitMessage();
   }
 
-  public static hacontract.GetLocation getDefaultInstance() {
+  public static hacontract.InitMessage getDefaultInstance() {
     return DEFAULT_INSTANCE;
   }
 
-  private static final com.google.protobuf.Parser<GetLocation>
-      PARSER = new com.google.protobuf.AbstractParser<GetLocation>() {
-    public GetLocation parsePartialFrom(
+  private static final com.google.protobuf.Parser<InitMessage>
+      PARSER = new com.google.protobuf.AbstractParser<InitMessage>() {
+    public InitMessage parsePartialFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
-      return new GetLocation(input, extensionRegistry);
+      return new InitMessage(input, extensionRegistry);
     }
   };
 
-  public static com.google.protobuf.Parser<GetLocation> parser() {
+  public static com.google.protobuf.Parser<InitMessage> parser() {
     return PARSER;
   }
 
   @java.lang.Override
-  public com.google.protobuf.Parser<GetLocation> getParserForType() {
+  public com.google.protobuf.Parser<InitMessage> getParserForType() {
     return PARSER;
   }
 
-  public hacontract.GetLocation getDefaultInstanceForType() {
+  public hacontract.InitMessage getDefaultInstanceForType() {
     return DEFAULT_INSTANCE;
   }
 

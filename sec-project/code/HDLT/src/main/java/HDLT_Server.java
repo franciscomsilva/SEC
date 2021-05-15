@@ -653,7 +653,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             responseObserver.onCompleted();
         }
 
-        @Override //TODO MULTIPLO SERVERS
+        @Override //TODO DIG SIG
         public void init(hacontract.InitMessage request, StreamObserver<hacontract.Key> responseObserver) {
             String user = request.getUser();
             SecretKey secretKey = null;

@@ -91,6 +91,38 @@ public final class HAProtocolGrpc {
      return getObtainUsersAtLocationMethod;
   }
 
+  private static volatile io.grpc.MethodDescriptor<hacontract.InitMessage,
+      hacontract.Key> getInitMethod;
+
+  @io.grpc.stub.annotations.RpcMethod(
+      fullMethodName = SERVICE_NAME + '/' + "init",
+      requestType = hacontract.InitMessage.class,
+      responseType = hacontract.Key.class,
+      methodType = io.grpc.MethodDescriptor.MethodType.UNARY)
+  public static io.grpc.MethodDescriptor<hacontract.InitMessage,
+      hacontract.Key> getInitMethod() {
+    io.grpc.MethodDescriptor<hacontract.InitMessage, hacontract.Key> getInitMethod;
+    if ((getInitMethod = HAProtocolGrpc.getInitMethod) == null) {
+      synchronized (HAProtocolGrpc.class) {
+        if ((getInitMethod = HAProtocolGrpc.getInitMethod) == null) {
+          HAProtocolGrpc.getInitMethod = getInitMethod = 
+              io.grpc.MethodDescriptor.<hacontract.InitMessage, hacontract.Key>newBuilder()
+              .setType(io.grpc.MethodDescriptor.MethodType.UNARY)
+              .setFullMethodName(generateFullMethodName(
+                  "hacontract.HAProtocol", "init"))
+              .setSampledToLocalTracing(true)
+              .setRequestMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  hacontract.InitMessage.getDefaultInstance()))
+              .setResponseMarshaller(io.grpc.protobuf.ProtoUtils.marshaller(
+                  hacontract.Key.getDefaultInstance()))
+                  .setSchemaDescriptor(new HAProtocolMethodDescriptorSupplier("init"))
+                  .build();
+          }
+        }
+     }
+     return getInitMethod;
+  }
+
   /**
    * Creates a new async stub that supports all call types for the service
    */
@@ -132,6 +164,13 @@ public final class HAProtocolGrpc {
       asyncUnimplementedUnaryCall(getObtainUsersAtLocationMethod(), responseObserver);
     }
 
+    /**
+     */
+    public void init(hacontract.InitMessage request,
+        io.grpc.stub.StreamObserver<hacontract.Key> responseObserver) {
+      asyncUnimplementedUnaryCall(getInitMethod(), responseObserver);
+    }
+
     @java.lang.Override public final io.grpc.ServerServiceDefinition bindService() {
       return io.grpc.ServerServiceDefinition.builder(getServiceDescriptor())
           .addMethod(
@@ -148,6 +187,13 @@ public final class HAProtocolGrpc {
                 hacontract.UserAtLocation,
                 hacontract.Users>(
                   this, METHODID_OBTAIN_USERS_AT_LOCATION)))
+          .addMethod(
+            getInitMethod(),
+            asyncUnaryCall(
+              new MethodHandlers<
+                hacontract.InitMessage,
+                hacontract.Key>(
+                  this, METHODID_INIT)))
           .build();
     }
   }
@@ -185,6 +231,14 @@ public final class HAProtocolGrpc {
       asyncUnaryCall(
           getChannel().newCall(getObtainUsersAtLocationMethod(), getCallOptions()), request, responseObserver);
     }
+
+    /**
+     */
+    public void init(hacontract.InitMessage request,
+        io.grpc.stub.StreamObserver<hacontract.Key> responseObserver) {
+      asyncUnaryCall(
+          getChannel().newCall(getInitMethod(), getCallOptions()), request, responseObserver);
+    }
   }
 
   /**
@@ -217,6 +271,13 @@ public final class HAProtocolGrpc {
     public hacontract.Users obtainUsersAtLocation(hacontract.UserAtLocation request) {
       return blockingUnaryCall(
           getChannel(), getObtainUsersAtLocationMethod(), getCallOptions(), request);
+    }
+
+    /**
+     */
+    public hacontract.Key init(hacontract.InitMessage request) {
+      return blockingUnaryCall(
+          getChannel(), getInitMethod(), getCallOptions(), request);
     }
   }
 
@@ -253,10 +314,19 @@ public final class HAProtocolGrpc {
       return futureUnaryCall(
           getChannel().newCall(getObtainUsersAtLocationMethod(), getCallOptions()), request);
     }
+
+    /**
+     */
+    public com.google.common.util.concurrent.ListenableFuture<hacontract.Key> init(
+        hacontract.InitMessage request) {
+      return futureUnaryCall(
+          getChannel().newCall(getInitMethod(), getCallOptions()), request);
+    }
   }
 
   private static final int METHODID_OBTAIN_LOCATION_REPORT = 0;
   private static final int METHODID_OBTAIN_USERS_AT_LOCATION = 1;
+  private static final int METHODID_INIT = 2;
 
   private static final class MethodHandlers<Req, Resp> implements
       io.grpc.stub.ServerCalls.UnaryMethod<Req, Resp>,
@@ -282,6 +352,10 @@ public final class HAProtocolGrpc {
         case METHODID_OBTAIN_USERS_AT_LOCATION:
           serviceImpl.obtainUsersAtLocation((hacontract.UserAtLocation) request,
               (io.grpc.stub.StreamObserver<hacontract.Users>) responseObserver);
+          break;
+        case METHODID_INIT:
+          serviceImpl.init((hacontract.InitMessage) request,
+              (io.grpc.stub.StreamObserver<hacontract.Key>) responseObserver);
           break;
         default:
           throw new AssertionError();
@@ -346,6 +420,7 @@ public final class HAProtocolGrpc {
               .setSchemaDescriptor(new HAProtocolFileDescriptorSupplier())
               .addMethod(getObtainLocationReportMethod())
               .addMethod(getObtainUsersAtLocationMethod())
+              .addMethod(getInitMethod())
               .build();
         }
       }

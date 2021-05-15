@@ -3,29 +3,24 @@
 
 package hacontract;
 
-public interface GetLocationOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:hacontract.GetLocation)
+public interface InitMessageOrBuilder extends
+    // @@protoc_insertion_point(interface_extends:hacontract.InitMessage)
     com.google.protobuf.MessageOrBuilder {
 
   /**
-   * <code>string message = 1;</code>
+   * <code>string user = 1;</code>
    */
-  java.lang.String getMessage();
+  java.lang.String getUser();
   /**
-   * <code>string message = 1;</code>
+   * <code>string user = 1;</code>
    */
   com.google.protobuf.ByteString
-      getMessageBytes();
+      getUserBytes();
 
   /**
-   * <code>string iv = 2;</code>
+   * <code>int32 counter = 2;</code>
    */
-  java.lang.String getIv();
-  /**
-   * <code>string iv = 2;</code>
-   */
-  com.google.protobuf.ByteString
-      getIvBytes();
+  int getCounter();
 
   /**
    * <code>string digSig = 3;</code>

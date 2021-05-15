@@ -5,10 +5,7 @@ import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
 import hacontract.*;
 import hacontract.Key;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import io.grpc.*;
 import userserver.UserServerGrpc;
 //import userserver.UserServerGrpc;
 
@@ -27,6 +24,9 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class HDLT_Ha {
 
@@ -36,10 +36,12 @@ public class HDLT_Ha {
 
     private static String user;
 
-    private static SecretKey symmetricKey;
     private static String keystore_password;
+    private static HashMap<String,Integer> counters = new HashMap<>();
+    private static ArrayList<SecretKey> symmetricKeys = new ArrayList<>();
 
-
+    private static int NUMBER_SERVERS = 4;
+    private static int BYZANTINE_SERVERS = 1;
 
 
 
@@ -58,7 +60,7 @@ public class HDLT_Ha {
         }
     }
 
-    public static void obtainLocationReport(String user, int epoch) {
+    public static void obtainLocationReport(int[] servers,String user, int epoch) {
 
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("epoch", epoch);
@@ -105,55 +107,84 @@ public class HDLT_Ha {
     }
 
 
-    private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, UnrecoverableKeyException, KeyStoreException {
-        byte[] messageSigned = Utils.signMessage("keystores/keystore_" + user + ".keystore",keystore_password,msgToSign);
-        return new String(Base64.getEncoder().encode(messageSigned));
-    }
-
-    public static void ObtainUsersAtLocation(int epoch, int xCoords, int yCoords) throws NoSuchPaddingException, UnrecoverableKeyException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, KeyStoreException, InvalidKeyException, IOException, InvalidKeySpecException {
+    public static void ObtainUsersAtLocation(int[] servers,int epoch, int xCoords, int yCoords) throws NoSuchPaddingException, UnrecoverableKeyException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, KeyStoreException, InvalidKeyException, IOException, InvalidKeySpecException, InterruptedException {
 
         JsonObject json =  new JsonObject();
         json.addProperty("epoch", epoch);
         json.addProperty("xCoords", xCoords);
         json.addProperty("yCoords", yCoords);
-        json.addProperty("counter");
         String messageSigned = signMessage(json.toString());
 
-        // Encriptação
-        String encryptedMessage = null;
-        IvParameterSpec ivSpec = null;
-        hacontract.LocationStatus ls = null;
-        try {
-            ivSpec = Utils.generateIv();
-            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,json.toString(),ivSpec);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
+        for (int i : servers) {
+            Runnable run = () -> {
+                changeServer(i);
+                int counter = counters.get("server" + i) + 1;
+                counters.put("server" + i, counter);
+                JsonObject json2 = json;
+                json2.addProperty("counter",counter);
+
+                // Encriptação
+                String encryptedMessage = null;
+                IvParameterSpec ivSpec = null;
+                hacontract.LocationStatus ls = null;
+                String digSig = null;
+                try {
+                    ivSpec = Utils.generateIv();
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i),json2.toString(),ivSpec);
+                    digSig = signMessage(json2.toString());
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                UserAtLocation ua = UserAtLocation.newBuilder().setIv(Base64.getEncoder()
+                        .encodeToString(ivSpec.getIV())).setMessage(encryptedMessage).setDigSig(digSig).build();
+
+                Users users;
+                try{
+                    users =  bStub.obtainUsersAtLocation(ua);
+                }catch(Exception e){
+                    Throwable cause = e.getCause();
+                    Status status = ((StatusException) cause).getStatus();
+                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                        init(i);
+                        try {
+                            ObtainUsersAtLocation(new int[]{i}, epoch,xCoords,yCoords);
+                        } catch (InterruptedException | NoSuchPaddingException | UnrecoverableKeyException | NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException | KeyStoreException | InvalidKeyException | IOException | InvalidKeySpecException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                    }
+                    System.err.println(e.getMessage());
+                    return;
+                }
+
+                // Desencriptar
+                encryptedMessage = users.getMessage();
+                byte[] iv =Base64.getDecoder().decode(users.getIv());
+                String decryptedMessage = null;
+                try {
+                    decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i),encryptedMessage,iv);
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+
+
+                /*VERIFY DIGITAL SIGNATURE SERVER'S DIGITAL SIGNATURE*/
+
+
+            };
+            executorService.execute(run);
+            Thread.sleep(100);
+            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
+                executorService.shutdownNow();
+            }
         }
 
-        UserAtLocation ua = UserAtLocation.newBuilder().setIv(Base64.getEncoder()
-                .encodeToString(ivSpec.getIV())).setMessage(encryptedMessage).setDigSig(messageSigned).build();
-
-        Users users;
-        try{
-            users =  bStub.obtainUsersAtLocation(ua);
-        }catch(Exception e){
-            System.err.println(e.getMessage());
-            return;
-        }
-
-        // Desencriptar
-        encryptedMessage = users.getMessage();
-        byte[] iv =Base64.getDecoder().decode(users.getIv());
-        String decryptedMessage = null;
-        try {
-            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
         String[] splits = decryptedMessage.split(";");
 
         for(String u : splits){
@@ -185,35 +216,100 @@ public class HDLT_Ha {
         return false;
     }
 
-    public static void main(String[] args) throws GeneralSecurityException, IOException {
-        readUsers();
+    private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, UnrecoverableKeyException, KeyStoreException {
+        byte[] messageSigned = Utils.signMessage("keystores/keystore_" + user + ".keystore",keystore_password,msgToSign);
+        return new String(Base64.getEncoder().encode(messageSigned));
+    }
 
+    public static void init(int server) {
+        Random r = new Random(System.currentTimeMillis());
+        int counter = 0;
+        String digSig = null, message = null;
+
+        /*INITIALIZES COUNTER*/
+        counter = r.nextInt();
+        counters.put("server" + server, counter);
+        message = user + "," + counter;
+        try {
+            digSig = signMessage(message);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        hacontract.InitMessage initMessage = hacontract.InitMessage.newBuilder().setUser(user).setCounter(counter).setDigSig(digSig).build();
+
+        hacontract.Key responseKey = bStub.init(initMessage);
+
+        String base64SymmetricKey = responseKey.getKey();
+        int c = responseKey.getCounter();
+        counters.put("server"+server, c);
+
+
+        byte[] symmetricKeyBytes = new byte[0];
+        try {
+            symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if(!verifyMessage("server"+server, base64SymmetricKey+","+c, responseKey.getDigSig())){
+            System.err.println("ERROR: Message not Verified");
+            return;
+        }
+        symmetricKeys.add(Utils.generateSymmetricKey(symmetricKeyBytes));
+    }
+
+
+    private static void changeServer(int n_server){
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
-        user = "clientHA";
         String svcIP = phrase.split(":")[0];
-        int sPort = Integer.parseInt(phrase.split(":")[1] )+ 50;
+        int sPort = Integer.parseInt(phrase.split(":")[1]) + n_server;
         ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
                 .usePlaintext()
                 .build();
         bStub = HAProtocolGrpc.newBlockingStub(channel);
+    }
 
-        hacontract.InitMessage initMessage = hacontract.InitMessage.newBuilder().setUser(user).build();
-        hacontract.Key responseKey = null;
-        try{
-            responseKey = bStub.init(initMessage);
-        }catch(Exception e){
-            System.err.println("ERROR: Server connection failed!");
-            return;
-        }
-        String base64SymmetricKey = responseKey.getKey();
+
+    public static void main(String[] args) throws GeneralSecurityException, IOException {
+        readUsers();
+
+        //Conexão com o servidor
+        user = "clientHA";
 
         /*GETS THE USER PASSWORD FROM INPUT*/
         keystore_password = Utils.getPasswordInput();
 
-        byte[] symmetricKeyBytes = Utils.decryptMessageAssymetric("keystores/keystore_" + user + ".keystore",keystore_password,base64SymmetricKey);
-        symmetricKey = Utils.generateSymmetricKey(symmetricKeyBytes);
+        int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
+        int i = 0;
+        int[] servers = new int[NUMBER_SERVERS];
+        try{
+            for (i = 1; i <= NUMBER_SERVERS ; i++) {
+                changeServer(i);
+                init(i);
+                servers[i-1] = i;
+            }
+        }catch(Exception e){
+            System.err.println("ERROR: Server connection failed!");
+            counters.remove("server" + i);
+            return;
+        }
+
+        //Instancia de Servidor para os Clients
+        Server svc = null;
+        try {
+            svc = ServerBuilder
+                    .forPort(svcPort)
+                    .addService(new HDLT_user())
+                    .build();
+
+            svc.start();
+
+            System.out.println("User HA Server started, listening on " + svcPort);
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
         System.out.println("\nAvailable commands:");
         System.out.println("- ObtainLocationReport (o <user> <epoch>): obtains location of indicated user at indicated epoch");
         System.out.println("- ObtainUsersAtLocation (r <epoch> <xCoord> <yCoord>): obtains users at specified epoch and X and Y coordinates");
@@ -231,7 +327,7 @@ public class HDLT_Ha {
                         String user = line.split(" ")[1];
                         epoch = Integer.parseInt(line.split(" ")[2]);
                         System.out.println("Requesting the position of "+user+" at epoch "+ epoch);
-                        obtainLocationReport(user,epoch);
+                        obtainLocationReport(servers,user,epoch);
                         break;
 
 

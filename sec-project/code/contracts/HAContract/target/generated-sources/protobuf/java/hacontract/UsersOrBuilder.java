@@ -8,21 +8,32 @@ public interface UsersOrBuilder extends
     com.google.protobuf.MessageOrBuilder {
 
   /**
-   * <code>repeated string ids = 1;</code>
+   * <code>string message = 1;</code>
    */
-  java.util.List<java.lang.String>
-      getIdsList();
+  java.lang.String getMessage();
   /**
-   * <code>repeated string ids = 1;</code>
-   */
-  int getIdsCount();
-  /**
-   * <code>repeated string ids = 1;</code>
-   */
-  java.lang.String getIds(int index);
-  /**
-   * <code>repeated string ids = 1;</code>
+   * <code>string message = 1;</code>
    */
   com.google.protobuf.ByteString
-      getIdsBytes(int index);
+      getMessageBytes();
+
+  /**
+   * <code>string iv = 2;</code>
+   */
+  java.lang.String getIv();
+  /**
+   * <code>string iv = 2;</code>
+   */
+  com.google.protobuf.ByteString
+      getIvBytes();
+
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  java.lang.String getDigSig();
+  /**
+   * <code>string digSig = 3;</code>
+   */
+  com.google.protobuf.ByteString
+      getDigSigBytes();
 }
