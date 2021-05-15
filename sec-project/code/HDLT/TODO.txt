@@ -16,7 +16,7 @@ Old TODO:
 New TODO:
 - implementar (1,N) Byzantine Regular:
     -requestMyProofs: DONE
-    -obtainUsersAtLocation: on going 
+    -obtainUsersAtLocation: on going
 - guardar os counters para permitir verificação - DONE
 - fazer a fase de write back nos atomic registers
 - o epoch server como timestamp

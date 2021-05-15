@@ -144,8 +144,6 @@ public class HDLT_Ha {
 
         for(String u : splits){
             String[] spl = u.split(",");
-
-
             System.out.println("USER: " + u);
         }
         System.out.println("");
