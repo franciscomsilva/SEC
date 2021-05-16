@@ -532,20 +532,49 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
         @Override
         public void obtainLocationReport(hacontract.GetLocation request, StreamObserver<hacontract.LocationStatus> responseObserver) {
+            String user = "clientHA";
             //Decoding
             String message = null;
             JsonObject convertedRequest = null;
+
             try {
                 byte[] iv = Base64.getDecoder().decode(request.getIv());
-                String user = "user_ha";
                 String encryptedMessage = request.getMessage();
-                message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
-                convertedRequest= new Gson().fromJson(message, JsonObject.class);
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: No Key for User " + user);
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
             } catch (Exception e) {
                 System.err.println("ERROR: Invalid key");
                 responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
                 return;
             }
+            if(!verifyMessage(user,message,request.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                return;
+            }
+            int c = convertedRequest.get("counter").getAsInt();
+            if(c <= userCounters.get(user)){
+                System.err.println("ERROR: Invalid counter");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
+                return;
+            }
+
             String requester = convertedRequest.get("user").getAsString();
             int epoch = convertedRequest.get("epoch").getAsInt();
             int[] coords = {0, 0};
@@ -570,14 +599,18 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 return;
             }
             //Encriptação
-            String resp = null;
+            String resp = null, respDigSig = null;
             IvParameterSpec iv = null;
             JsonObject coords_object = new JsonObject();
             coords_object.addProperty("xCoords",coords[0]);
             coords_object.addProperty("yCoords",coords[1]);
+            coords_object.addProperty("counter",c+1);
+            userCounters.replace(user, c+1);
+
             try {
                 iv = Utils.generateIv();
                 resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),coords_object.toString(),iv);
+                respDigSig = signMessage(coords_object.toString());
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -585,28 +618,57 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             }
 
 
-            hacontract.LocationStatus ls = hacontract.LocationStatus.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+            hacontract.LocationStatus ls = hacontract.LocationStatus.newBuilder().setMessage(resp).
+                    setDigSig(respDigSig).setIv(Base64.getEncoder()
                     .encodeToString(iv.getIV())).build();
             responseObserver.onNext(ls);
             responseObserver.onCompleted();
         }
 
         @Override
-        public void obtainUsersAtLocation(UserAtLocation request, StreamObserver<Users> responseObserver) {
+        public void obtainUsersAtLocation(UserAtLocation request, StreamObserver<Users> responseObserver) {String user = "clientHA";
             //Decoding
             String message = null;
             JsonObject convertedRequest = null;
+
             try {
                 byte[] iv = Base64.getDecoder().decode(request.getIv());
-                String user = "user_ha";
                 String encryptedMessage = request.getMessage();
-                message = Utils.decryptMessageSymmetric(userSymmetricKeys.get(user),encryptedMessage,iv);
-                convertedRequest= new Gson().fromJson(message, JsonObject.class);
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: No Key for User " + user);
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
             } catch (Exception e) {
                 System.err.println("ERROR: Invalid key");
                 responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
                 return;
             }
+            if(!verifyMessage(user,message,request.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                return;
+            }
+            int c = convertedRequest.get("counter").getAsInt();
+            if(c <= userCounters.get(user)){
+                System.err.println("ERROR: Invalid counter");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
+                return;
+            }
+
             int epoch = convertedRequest.get("epoch").getAsInt();
             int xCoords = convertedRequest.get("xCoords").getAsInt();
             int yCoords = convertedRequest.get("yCoords").getAsInt();
@@ -633,10 +695,11 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
             JsonObject response = new JsonObject();
             StringBuilder sb = new StringBuilder();
-            for(String user : users){
-                sb.append(user + ";");
+            for(String user2 : users){
+                sb.append(user2 + ";");
             }
-            response.addProperty("counter", userCounters.get("clientHA"));
+            userCounters.replace(user, c+1);
+            response.addProperty("counter", c+1);
             response.addProperty("users",sb.toString());
 
             //Encriptação
@@ -659,14 +722,23 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             responseObserver.onCompleted();
         }
 
-        @Override //TODO DIG SIG
+        @Override
         public void init(hacontract.InitMessage request, StreamObserver<hacontract.Key> responseObserver) {
             String user = request.getUser();
+            int c = request.getCounter();
             SecretKey secretKey = null;
             try {
+                String verify = user + "," + c;
+                if(!verifyMessage(user, verify, request.getDigSig())){
+                    System.err.println("ERROR: Message not Verified");
+                    responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                    return;
+                }
+
                 secretKey = AESKeyGenerator.write();
                 userSymmetricKeys.put(user,secretKey);
-                //saveKeysToFile();
+                userSymmetricKeysCounter.put(secretKey, 10);
+
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -683,9 +755,13 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
             try {
                 String encryptedKey = Utils.encryptSymmetricKey(pubKey,secretKey);
-                hacontract.Key symmetricKeyResponse = hacontract.Key.newBuilder().setKey(encryptedKey).build();
+                String msg = encryptedKey + "," + (c+1);
+                String digSig = signMessage(msg);
+                hacontract.Key symmetricKeyResponse = hacontract.Key.newBuilder().setKey(encryptedKey).
+                        setDigSig(digSig).setCounter(c+1).build();
                 responseObserver.onNext(symmetricKeyResponse);
                 responseObserver.onCompleted();
+                userCounters.put(user, c+1);
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {

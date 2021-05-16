@@ -61,50 +61,99 @@ public class HDLT_Ha {
         }
     }
 
-    public static void obtainLocationReport(int[] servers,String user, int epoch) {
+    public static void obtainLocationReport(int[] servers,String user, int epoch) throws InterruptedException {
 
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("epoch", epoch);
         jsonObject.addProperty("user", user);
 
+        ArrayList<JsonObject> serverResponses = new ArrayList<>();
+        ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
+        for (int i : servers) {
+            Runnable run = () -> {
+                changeServer(i);
+                int counter = counters.get("server" + i) + 1;
+                counters.put("server" + i, counter);
+                JsonObject json2 = jsonObject;
+                json2.addProperty("counter",counter);
 
-        // Encriptação
-        String encryptedMessage = null;
-        IvParameterSpec ivSpec = null;
-        hacontract.LocationStatus ls = null;
-        try {
-            ivSpec = Utils.generateIv();
-            encryptedMessage = Utils.encryptMessageSymmetric(symmetricKey,jsonObject.toString(),ivSpec);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+                // Encriptação
+                String encryptedMessage = null;
+                IvParameterSpec ivSpec = null;
+                String digSig = null;
+                hacontract.LocationStatus resp = null;
+                try {
+                    ivSpec = Utils.generateIv();
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
+                    digSig = signMessage(json2.toString());
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                hacontract.GetLocation gl = hacontract.GetLocation.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                        .encodeToString(ivSpec.getIV())).setDigSig(digSig).build();
+                try {
+                    resp = bStub.obtainLocationReport(gl);
+                } catch (Exception e) {
+                    Throwable cause = e.getCause();
+                    Status status = ((StatusException) cause).getStatus();
+                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                        init(i);
+                        try {
+                            obtainLocationReport(new int[]{i},user, epoch);
+                        } catch (InterruptedException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                    }
+                    System.err.println(e.getMessage());
+                    return;
+                }
+                // Desencriptar
+                encryptedMessage = resp.getMessage();
+                byte[] iv = Base64.getDecoder().decode(resp.getIv());
+                String decryptedMessage = null;
+                try {
+                    decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+                /*VERIFY DIGITAL SIGNATURE SERVER'S DIGITAL SIGNATURE*/
+                if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
+                    System.err.println("ERROR: Message not Verified");
+                    return;
+                }
+
+                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                    System.err.println("ERROR: Wrong message received");
+                    return;
+                }
+                counter
+                serverResponses.add(convertedResponse);
+
+            };
+            executorService.execute(run);
+            Thread.sleep(100);
+            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
+                executorService.shutdownNow();
+            }
         }
 
-        hacontract.GetLocation gl = hacontract.GetLocation.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
-                .encodeToString(ivSpec.getIV())).build();
-        try{
-            ls = bStub.obtainLocationReport(gl);
-        }catch(Exception e){
-            System.err.println(e.getMessage());
+        /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
+        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
+            for (JsonObject jsonObj : serverResponses) {
+                //TODO VERIFICAR QUE AS STRING SAO IGUAIS E APENAS IMPRIMIR UMA VEZ
+                System.out.println(json.get("users").getAsString());
+            }
+        }else{
+            System.err.println("ERROR: Wrong number of servers responded");
             return;
         }
-        // Desencriptar
-        encryptedMessage = ls.getMessage();
-        byte[] iv =Base64.getDecoder().decode(ls.getIv());
-        String decryptedMessage = null;
-        try {
-            decryptedMessage = Utils.decryptMessageSymmetric(symmetricKey,encryptedMessage,iv);
-        } catch (GeneralSecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
-
-
-        System.out.println("User "+user+" at "+epoch+" are in coordinates ("+convertedResponse.get("xCoords").getAsInt()+","+convertedResponse.get("yCoords").getAsInt()+")");
-
     }
 
 
@@ -114,7 +163,6 @@ public class HDLT_Ha {
         json.addProperty("epoch", epoch);
         json.addProperty("xCoords", xCoords);
         json.addProperty("yCoords", yCoords);
-        String messageSigned = signMessage(json.toString());
 
         ArrayList<JsonObject> serverResponses = new ArrayList<>();
 
@@ -176,6 +224,7 @@ public class HDLT_Ha {
                     e.printStackTrace();
                 }
                 JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+                counter = convertedResponse.get("counter").getAsInt();
 
                 /*VERIFY DIGITAL SIGNATURE SERVER'S DIGITAL SIGNATURE*/
                 if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
@@ -183,10 +232,11 @@ public class HDLT_Ha {
                     return;
                 }
 
-                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                if (counter <= counters.get("server" + i)) {
                     System.err.println("ERROR: Wrong message received");
                     return;
                 }
+                counters.replace("server"+i,counter);
                 serverResponses.add(convertedResponse);
             };
             executorService.execute(run);
@@ -195,16 +245,71 @@ public class HDLT_Ha {
                 executorService.shutdownNow();
             }
         }
-        String users = null;
         /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
         if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
             for (JsonObject jsonObj : serverResponses) {
-                //TODO VERIFICAR QUE AS STRING SAO IGUAIS E APENAS IMPRIMIR UMA VEZ
-                System.out.println(json.get("users").getAsString());
+                System.out.println(json.get("xCoords").getAsString());
+                System.out.println(json.get("yCoords").getAsString());
+                //TODO: VERIFY IF ALL THE MESSAGES ARE THE SAME
             }
         }else{
             System.err.println("ERROR: Wrong number of servers responded");
             return;
+        }
+
+        /*WRITE-BACK SERVER: CLIENT WRITES EXACTLY WHAT IT READ*/
+        for (int i : servers) {
+            Runnable run = () -> {
+                changeServer(i);
+                int counter = counters.get("server" + i) + 1;
+                counters.put("server" + i, counter);
+                JsonObject response = serverResponses.get(1);
+
+                /*SENDS THE PREVIOUSLY RECEIVED SERVER JSON*/
+
+                String encryptedMessage = null;
+                IvParameterSpec ivSpec = null;
+                hacontract.LocationStatus ls = null;
+                String digSig = null;
+                try {
+                    ivSpec = Utils.generateIv();
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i),response.toString(),ivSpec);
+                    digSig = signMessage(response.toString());
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                UserAtLocation ua = UserAtLocation.newBuilder().setIv(Base64.getEncoder()
+                        .encodeToString(ivSpec.getIV())).setMessage(encryptedMessage).setDigSig(digSig).build();
+
+                Users resp;
+                try{
+                    resp =  bStub.obtainUsersAtLocation(ua);
+                }catch(Exception e){
+                    Throwable cause = e.getCause();
+                    Status status = ((StatusException) cause).getStatus();
+                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                        init(i);
+                        try {
+                            ObtainUsersAtLocation(new int[]{i}, epoch,xCoords,yCoords);
+                        } catch (InterruptedException | NoSuchPaddingException | UnrecoverableKeyException | NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException | KeyStoreException | InvalidKeyException | IOException | InvalidKeySpecException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                    }
+                    System.err.println(e.getMessage());
+                    return;
+                }
+
+
+
+            };
+            executorService.execute(run);
+            Thread.sleep(100);
+            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
+                executorService.shutdownNow();
+            }
         }
 
     }
@@ -239,7 +344,7 @@ public class HDLT_Ha {
     public static void init(int server) {
         Random r = new Random(System.currentTimeMillis());
         int counter = 0;
-        String digSig = null, message = null;
+        String digSig = null, message;
 
         /*INITIALIZES COUNTER*/
         counter = r.nextInt();
@@ -256,8 +361,12 @@ public class HDLT_Ha {
 
         String base64SymmetricKey = responseKey.getKey();
         int c = responseKey.getCounter();
-        counters.put("server"+server, c);
 
+        if(c <= counter){
+            System.err.println("ERROR: Wrong message counter received!");
+            return;
+        }
+        counters.put("server"+server, c);
 
         byte[] symmetricKeyBytes = new byte[0];
         try {

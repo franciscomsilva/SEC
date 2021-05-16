@@ -214,8 +214,13 @@ public class HDLT_user extends UserProtocolImplBase{
 
         String base64SymmetricKey = responseKey.getKey();
         int c = responseKey.getCounter();
-        counters.put("server"+server, c);
 
+        if(c <= counter){
+            System.err.println("ERROR: Wrong message counter received!");
+            return;
+        }
+
+        counters.put("server"+server, c);
 
         byte[] symmetricKeyBytes = new byte[0];
         try {
@@ -489,7 +494,6 @@ public class HDLT_user extends UserProtocolImplBase{
                         } catch (InterruptedException interruptedException) {
                             interruptedException.printStackTrace();
                         }
-                        //return;
                     }
                     System.err.println(e.getMessage());
                     return;
@@ -508,17 +512,18 @@ public class HDLT_user extends UserProtocolImplBase{
                 }
 
                 JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
-
+                counter = convertedResponse.get("counter").getAsInt();
                 if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
                     System.err.println("ERROR: Message not Verified");
                     return;
                 }
 
-                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                if (counter <= counters.get("server" + i)) {
                     System.err.println("ERROR: Wrong message received");
                     return;
                 }
                 convertedResponse.remove("counter");
+                counters.replace("server" + i, counter);
                 serverResponses.add(convertedResponse);
             };
             executorService.execute(run);

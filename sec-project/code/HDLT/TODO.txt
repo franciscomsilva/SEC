@@ -18,13 +18,16 @@ New TODO:
     -requestMyProofs: DONE
     -obtainUsersAtLocation: DONE
 - implementar (1,N) Byzantine Atomic:
-    -obtainLocationReport():
+    -obtainLocationReport(): on going
     -submitLocationReport()
 - guardar os counters para permitir verificação - DONE
 - fazer a fase de write back nos atomic registers
 - o epoch server como timestamp
 - mecanismo de spam
 - ver o problema de byzantine users
+- Verificar se os users (normal e HA) estão a guardar o counter que recebem do sv depois de enviarem o pedido
+- Verificar se o init do HA está correto
+- Nem todos os returns tem writerDigSIg e verificam esta, analisar se houver tempo
 
 Stage 2:
 - step 1 - DONE
@@ -34,7 +37,4 @@ Stage 2:
 - step 5
 
 
-
 Questions:
-- obtainUsersAtLocation() - temos de verificar a assinatura da mensagem toda, ou as assinaturas das proofs? (ou ambas?)
-- como passar de byzantine regular register para byzantine atomic register?
