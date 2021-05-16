@@ -1,5 +1,6 @@
 import Utils.Utils;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
@@ -115,6 +116,9 @@ public class HDLT_Ha {
         json.addProperty("yCoords", yCoords);
         String messageSigned = signMessage(json.toString());
 
+        ArrayList<JsonObject> serverResponses = new ArrayList<>();
+
+
         ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
         for (int i : servers) {
             Runnable run = () -> {
@@ -142,9 +146,9 @@ public class HDLT_Ha {
                 UserAtLocation ua = UserAtLocation.newBuilder().setIv(Base64.getEncoder()
                         .encodeToString(ivSpec.getIV())).setMessage(encryptedMessage).setDigSig(digSig).build();
 
-                Users users;
+                Users resp;
                 try{
-                    users =  bStub.obtainUsersAtLocation(ua);
+                    resp =  bStub.obtainUsersAtLocation(ua);
                 }catch(Exception e){
                     Throwable cause = e.getCause();
                     Status status = ((StatusException) cause).getStatus();
@@ -161,8 +165,8 @@ public class HDLT_Ha {
                 }
 
                 // Desencriptar
-                encryptedMessage = users.getMessage();
-                byte[] iv =Base64.getDecoder().decode(users.getIv());
+                encryptedMessage = resp.getMessage();
+                byte[] iv =Base64.getDecoder().decode(resp.getIv());
                 String decryptedMessage = null;
                 try {
                     decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i),encryptedMessage,iv);
@@ -171,12 +175,19 @@ public class HDLT_Ha {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
-
+                JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
 
                 /*VERIFY DIGITAL SIGNATURE SERVER'S DIGITAL SIGNATURE*/
+                if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
+                    System.err.println("ERROR: Message not Verified");
+                    return;
+                }
 
-
+                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                    System.err.println("ERROR: Wrong message received");
+                    return;
+                }
+                serverResponses.add(convertedResponse);
             };
             executorService.execute(run);
             Thread.sleep(100);
@@ -184,14 +195,18 @@ public class HDLT_Ha {
                 executorService.shutdownNow();
             }
         }
-
-        String[] splits = decryptedMessage.split(";");
-
-        for(String u : splits){
-            String[] spl = u.split(",");
-            System.out.println("USER: " + u);
+        String users = null;
+        /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
+        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
+            for (JsonObject jsonObj : serverResponses) {
+                //TODO VERIFICAR QUE AS STRING SAO IGUAIS E APENAS IMPRIMIR UMA VEZ
+                System.out.println(json.get("users").getAsString());
+            }
+        }else{
+            System.err.println("ERROR: Wrong number of servers responded");
+            return;
         }
-        System.out.println("");
+
     }
 
     public static boolean verifyMessage(String node, String message, String digSig) {
@@ -337,7 +352,7 @@ public class HDLT_Ha {
                         int xCoords = Integer.parseInt(line.split(" ")[2]);
                         int yCoords = Integer.parseInt(line.split(" ")[3]);
                         System.out.println("Requesting Location Proof to nearby users");
-                        ObtainUsersAtLocation(epoch,xCoords,yCoords);
+                        ObtainUsersAtLocation(servers,epoch,xCoords,yCoords);
                         break;
 
 

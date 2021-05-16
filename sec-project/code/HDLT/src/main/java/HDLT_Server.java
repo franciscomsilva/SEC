@@ -630,17 +630,23 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                 responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for those coordinates in that epoch!")));
                 return;
             }
+
+            JsonObject response = new JsonObject();
             StringBuilder sb = new StringBuilder();
             for(String user : users){
                 sb.append(user + ";");
             }
+            response.addProperty("counter", userCounters.get("clientHA"));
+            response.addProperty("users",sb.toString());
 
             //Encriptação
             String resp = null;
             IvParameterSpec iv = null;
+            String digSig = null;
             try {
                 iv = Utils.generateIv();
-                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),sb.toString(),iv);
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("clientHA"),response.toString(),iv);
+                digSig = signMessage(response.toString());
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -648,7 +654,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             }
 
             Users u = Users.newBuilder().setIv(Base64.getEncoder()
-                    .encodeToString(iv.getIV())).setMessage(resp).build();
+                    .encodeToString(iv.getIV())).setMessage(resp).setDigSig(digSig).build();
             responseObserver.onNext(u);
             responseObserver.onCompleted();
         }

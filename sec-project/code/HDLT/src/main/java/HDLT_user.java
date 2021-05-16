@@ -538,7 +538,7 @@ public class HDLT_user extends UserProtocolImplBase{
                      */
                     String verify = jo.get("user").getAsString() + "," + jo.get("epoch").getAsString() + "," + jo.get("xCoord").getAsString() + "," + jo.get("yCoord").getAsString();
                     if (verifyMessage(user, verify, jo.get("digSig").getAsString())) {
-                        System.out.println(serverResponses);
+                        System.out.println(verify);
                         // TODO: alterar e apenas fazer 1 print para cada proof
                     } else {
                         System.err.println("ERROR: Invalid signature on proof");
