@@ -34,7 +34,7 @@ public class HDLT_Ha {
     static HashMap<String,String> UsersMap = new HashMap<>();
 
     static HAProtocolGrpc.HAProtocolBlockingStub bStub;
-    static UserServerGrpc.UserServerBlockingStub bStubUS;
+    //static UserServerGrpc.UserServerBlockingStub bStubUS;
 
     private static String user;
 
@@ -133,7 +133,7 @@ public class HDLT_Ha {
                     System.err.println("ERROR: Wrong message received");
                     return;
                 }
-                counter
+                counters.replace("server"+i,counter);
                 serverResponses.add(convertedResponse);
 
             };
@@ -148,7 +148,7 @@ public class HDLT_Ha {
         if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
             for (JsonObject jsonObj : serverResponses) {
                 //TODO VERIFICAR QUE AS STRING SAO IGUAIS E APENAS IMPRIMIR UMA VEZ
-                System.out.println(json.get("users").getAsString());
+                System.out.println(jsonObj.get("users").getAsString());
             }
         }else{
             System.err.println("ERROR: Wrong number of servers responded");

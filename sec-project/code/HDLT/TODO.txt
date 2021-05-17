@@ -18,12 +18,10 @@ New TODO:
     -requestMyProofs: DONE
     -obtainUsersAtLocation: DONE
 - implementar (1,N) Byzantine Atomic:
-    -obtainLocationReport(): on going
-    -submitLocationReport()
+    -obtainLocationReport(): fazer write-back (mandar o report todo no server para verificar digsig)
+    -submitLocationReport(): tentar chamar submit no HA_Server; se n der, colocar stub no HA_Client
 - guardar os counters para permitir verificação - DONE
-- fazer a fase de write back nos atomic registers
-- o epoch server como timestamp
-- mecanismo de spam
+- mecanismo de spam - DONE
 - ver o problema de byzantine users
 - Verificar se os users (normal e HA) estão a guardar o counter que recebem do sv depois de enviarem o pedido
 - Verificar se o init do HA está correto
