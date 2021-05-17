@@ -33,7 +33,8 @@ public class HDLT_Ha {
 
     static HashMap<String,String> UsersMap = new HashMap<>();
 
-    static HAProtocolGrpc.HAProtocolBlockingStub bStub;//TODO Mudar o tipo de stub consoante o contracto
+    static HAProtocolGrpc.HAProtocolBlockingStub bStub;
+    static UserServerGrpc.UserServerBlockingStub bStubUS;
 
     private static String user;
 
@@ -43,7 +44,6 @@ public class HDLT_Ha {
 
     private static int NUMBER_SERVERS = 4;
     private static int BYZANTINE_SERVERS = 1;
-
 
 
     public static void readUsers() {

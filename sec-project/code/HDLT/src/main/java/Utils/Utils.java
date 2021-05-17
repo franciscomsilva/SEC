@@ -188,4 +188,11 @@ public class Utils {
         return scanner. nextLine();
     }
 
+    public static String computeSHA256(String msg) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hash = digest.digest(msg.getBytes(StandardCharsets.UTF_8));
+        String sha256hex = bytesToHex(hash);
+        return sha256hex;
+    }
+
 }

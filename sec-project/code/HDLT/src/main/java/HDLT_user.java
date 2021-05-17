@@ -370,13 +370,15 @@ public class HDLT_user extends UserProtocolImplBase{
         return false;
     }
 
-    public static void ObtainLocation(int[] servers, int epoch){
+    public static void ObtainLocation(int[] servers, int epoch) throws NoSuchAlgorithmException {
 
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
         json.addProperty("Epoch",epoch);
 
-        // Encriptação
+        // Proof-of-Work
+        final String[] powData = computePoW(json.toString());
+
         for (int i : servers) {
             changeServer(i);
             String encryptedMessage = null;
@@ -388,6 +390,8 @@ public class HDLT_user extends UserProtocolImplBase{
 
             JsonObject json2 = json;
             json2.addProperty("counter",counter);
+            json2.addProperty("nounce", powData[0]);
+            json2.addProperty("pow", powData[1]);
 
             try {
                 ivSpec = Utils.generateIv();
@@ -445,7 +449,7 @@ public class HDLT_user extends UserProtocolImplBase{
     }
 
     /*Requests the users' proofs to the servers*/
-    public static void requestProofs(int[] servers, int[] epochs) throws InterruptedException {
+    public static void requestProofs(int[] servers, int[] epochs) throws InterruptedException, NoSuchAlgorithmException {
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
         String eps = null;
@@ -454,9 +458,12 @@ public class HDLT_user extends UserProtocolImplBase{
         }
         json.addProperty("epochs", eps);
 
-
         ArrayList<JsonObject> serverResponses = new ArrayList<>();
         ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
+
+        // Proof-of-Work
+        final String[] powData = computePoW(json.toString());
+
         for (int i : servers) {
             Runnable run = () -> {
                 changeServer(i);
@@ -464,6 +471,8 @@ public class HDLT_user extends UserProtocolImplBase{
                 counters.put("server" + i, counter);
                 JsonObject json2 = json;
                 json2.addProperty("counter",counter);
+                json2.addProperty("nounce", powData[0]);
+                json2.addProperty("pow", powData[1]);
 
                 // Encriptação
                 String encryptedMessage = null;
@@ -493,6 +502,8 @@ public class HDLT_user extends UserProtocolImplBase{
                             requestProofs(new int[]{i}, epochs);
                         } catch (InterruptedException interruptedException) {
                             interruptedException.printStackTrace();
+                        } catch (NoSuchAlgorithmException noSuchAlgorithmException) {
+                            noSuchAlgorithmException.printStackTrace();
                         }
                     }
                     System.err.println(e.getMessage());
@@ -553,8 +564,6 @@ public class HDLT_user extends UserProtocolImplBase{
         }
     }
 
-
-
     private static void changeServer(int n_server){
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
@@ -581,6 +590,19 @@ public class HDLT_user extends UserProtocolImplBase{
         return intArr;
     }
 
+    private static String[] computePoW (String msg) throws NoSuchAlgorithmException {
+        Random r = new Random(System.currentTimeMillis());
+        Boolean finish = false;
+        String hash = null;
+        int n = 0;
+        while (!finish) {
+            n = r.nextInt();
+            hash = Utils.computeSHA256(msg + n);
+            if (hash.substring(0, 1).equals("00"))
+                finish = true;
+        }
+        return new String[]{String.valueOf(n), hash};
+    }
 
     public static void main(String[] args) throws GeneralSecurityException, IOException {
 

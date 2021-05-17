@@ -17,6 +17,7 @@ private static final long serialVersionUID = 0L;
   }
   private Key() {
     key_ = "";
+    counter_ = 0;
     digSig_ = "";
   }
 
@@ -55,6 +56,11 @@ private static final long serialVersionUID = 0L;
             java.lang.String s = input.readStringRequireUtf8();
 
             key_ = s;
+            break;
+          }
+          case 16: {
+
+            counter_ = input.readInt32();
             break;
           }
           case 26: {
@@ -121,6 +127,15 @@ private static final long serialVersionUID = 0L;
     }
   }
 
+  public static final int COUNTER_FIELD_NUMBER = 2;
+  private int counter_;
+  /**
+   * <code>int32 counter = 2;</code>
+   */
+  public int getCounter() {
+    return counter_;
+  }
+
   public static final int DIGSIG_FIELD_NUMBER = 3;
   private volatile java.lang.Object digSig_;
   /**
@@ -170,6 +185,9 @@ private static final long serialVersionUID = 0L;
     if (!getKeyBytes().isEmpty()) {
       com.google.protobuf.GeneratedMessageV3.writeString(output, 1, key_);
     }
+    if (counter_ != 0) {
+      output.writeInt32(2, counter_);
+    }
     if (!getDigSigBytes().isEmpty()) {
       com.google.protobuf.GeneratedMessageV3.writeString(output, 3, digSig_);
     }
@@ -183,6 +201,10 @@ private static final long serialVersionUID = 0L;
     size = 0;
     if (!getKeyBytes().isEmpty()) {
       size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, key_);
+    }
+    if (counter_ != 0) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeInt32Size(2, counter_);
     }
     if (!getDigSigBytes().isEmpty()) {
       size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, digSig_);
@@ -205,6 +227,8 @@ private static final long serialVersionUID = 0L;
     boolean result = true;
     result = result && getKey()
         .equals(other.getKey());
+    result = result && (getCounter()
+        == other.getCounter());
     result = result && getDigSig()
         .equals(other.getDigSig());
     result = result && unknownFields.equals(other.unknownFields);
@@ -220,6 +244,8 @@ private static final long serialVersionUID = 0L;
     hash = (19 * hash) + getDescriptor().hashCode();
     hash = (37 * hash) + KEY_FIELD_NUMBER;
     hash = (53 * hash) + getKey().hashCode();
+    hash = (37 * hash) + COUNTER_FIELD_NUMBER;
+    hash = (53 * hash) + getCounter();
     hash = (37 * hash) + DIGSIG_FIELD_NUMBER;
     hash = (53 * hash) + getDigSig().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
@@ -353,6 +379,8 @@ private static final long serialVersionUID = 0L;
       super.clear();
       key_ = "";
 
+      counter_ = 0;
+
       digSig_ = "";
 
       return this;
@@ -378,6 +406,7 @@ private static final long serialVersionUID = 0L;
     public hacontract.Key buildPartial() {
       hacontract.Key result = new hacontract.Key(this);
       result.key_ = key_;
+      result.counter_ = counter_;
       result.digSig_ = digSig_;
       onBuilt();
       return result;
@@ -423,6 +452,9 @@ private static final long serialVersionUID = 0L;
       if (!other.getKey().isEmpty()) {
         key_ = other.key_;
         onChanged();
+      }
+      if (other.getCounter() != 0) {
+        setCounter(other.getCounter());
       }
       if (!other.getDigSig().isEmpty()) {
         digSig_ = other.digSig_;
@@ -520,6 +552,32 @@ private static final long serialVersionUID = 0L;
   checkByteStringIsUtf8(value);
       
       key_ = value;
+      onChanged();
+      return this;
+    }
+
+    private int counter_ ;
+    /**
+     * <code>int32 counter = 2;</code>
+     */
+    public int getCounter() {
+      return counter_;
+    }
+    /**
+     * <code>int32 counter = 2;</code>
+     */
+    public Builder setCounter(int value) {
+      
+      counter_ = value;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>int32 counter = 2;</code>
+     */
+    public Builder clearCounter() {
+      
+      counter_ = 0;
       onChanged();
       return this;
     }

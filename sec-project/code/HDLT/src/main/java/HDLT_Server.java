@@ -151,12 +151,12 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             return;
         }
         String requester = convertedRequest.get("userID").getAsString();
-        int c = convertedRequest.get("counter").getAsInt();
-        if(!requester.equals(user)){
+        /*if(!requester.equals(user)){
             System.err.println("ERROR: Invalid user");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid user"))));
             return;
-        }
+        }*/
+        int c = convertedRequest.get("counter").getAsInt();
         if(c <= userCounters.get(user)){
             System.err.println("ERROR: Invalid counter");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
@@ -244,7 +244,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                         epoch_object.addProperty("epoch",epoch);
                         reports_array = new JsonArray();
                         flagEpoch = true;
-                    }else{
+                    } else{
                         reports_array = epoch_object.getAsJsonArray("reports");
                     }
                     JsonObject reportObject = new JsonObject();
@@ -355,6 +355,24 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             return;
         }
 
+        //Proof-of-Work
+        int nounce = convertedRequest.get("nounce").getAsInt();
+        String pow = convertedRequest.get("pow").getAsString();
+        convertedRequest.remove("nounce");
+        convertedRequest.remove("pow");
+        convertedRequest.remove("counter");
+        Boolean powVerify = false;
+        try {
+            powVerify = verifyPoW(convertedRequest.toString(), nounce, pow);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        if (!powVerify) {
+            System.err.println("ERROR: Invalid Proof-of-Work");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid Proof-of-Work"))));
+            return;
+        }
+
         String requester = convertedRequest.get("userID").getAsString();
         int epoch = convertedRequest.get("Epoch").getAsInt();
         int[] coords = {0,0};
@@ -450,6 +468,24 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         if(c <= userCounters.get(user)){
             System.err.println("ERROR: Invalid counter");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
+            return;
+        }
+
+        //Proof-of-Work
+        int nounce = convertedRequest.get("nounce").getAsInt();
+        String pow = convertedRequest.get("pow").getAsString();
+        convertedRequest.remove("nounce");
+        convertedRequest.remove("pow");
+        convertedRequest.remove("counter");
+        Boolean powVerify = false;
+        try {
+            powVerify = verifyPoW(convertedRequest.toString(), nounce, pow);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        if (!powVerify) {
+            System.err.println("ERROR: Invalid Proof-of-Work");
+            responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid Proof-of-Work"))));
             return;
         }
 
@@ -802,6 +838,16 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         return new String(Base64.getEncoder().encode(messageSigned));
     }
 
+    private static Boolean verifyPoW(String msg, int nounce, String hash) throws NoSuchAlgorithmException {
+        String calcHash = Utils.computeSHA256(msg + nounce);
+        if (calcHash.equals(hash)) {
+            //if (calcHash.charAt(0) == '0' && calcHash.charAt(1) == '0')
+            if (calcHash.substring(0, 1).equals("00"))
+                return true;
+        }
+        return false;
+    }
+
     public static void main(String[] args) throws IOException {
         readUsers();
         n_server = Integer.parseInt(args[0]);
@@ -810,7 +856,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         Server svc = null;
         Server svc_HA = null;
 
-        //readKeysFromFile();
         readReportsFromFile();
 
 

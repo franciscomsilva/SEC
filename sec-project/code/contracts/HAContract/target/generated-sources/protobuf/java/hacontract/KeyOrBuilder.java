@@ -18,6 +18,11 @@ public interface KeyOrBuilder extends
       getKeyBytes();
 
   /**
+   * <code>int32 counter = 2;</code>
+   */
+  int getCounter();
+
+  /**
    * <code>string digSig = 3;</code>
    */
   java.lang.String getDigSig();
