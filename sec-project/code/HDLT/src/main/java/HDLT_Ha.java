@@ -7,6 +7,8 @@ import com.opencsv.exceptions.CsvValidationException;
 import hacontract.*;
 import hacontract.Key;
 import io.grpc.*;
+import userserver.LocationReport;
+import userserver.LocationResponse;
 import userserver.UserServerGrpc;
 //import userserver.UserServerGrpc;
 
@@ -34,7 +36,7 @@ public class HDLT_Ha {
     static HashMap<String,String> UsersMap = new HashMap<>();
 
     static HAProtocolGrpc.HAProtocolBlockingStub bStub;
-    //static UserServerGrpc.UserServerBlockingStub bStubUS;
+    static UserServerGrpc.UserServerBlockingStub bStubUS;
 
     private static String user;
 
@@ -134,7 +136,92 @@ public class HDLT_Ha {
                     return;
                 }
                 counters.replace("server"+i,counter);
-                serverResponses.add(convertedResponse);
+                if (verifyMessage(user, convertedResponse.toString(), convertedResponse.get("writerDigSig").getAsString())) {
+                    serverResponses.add(convertedResponse);
+                }
+
+            };
+            executorService.execute(run);
+            Thread.sleep(100);
+            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
+                executorService.shutdownNow();
+            }
+        }
+        HashMap<JsonObject,Integer> response_counter = new HashMap<>();
+        int counter_responses = 0;
+        JsonObject finalResponse = new JsonObject();
+        /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
+        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
+            for (JsonObject jsonObj : serverResponses) {
+                if(response_counter.containsKey(jsonObj)){
+                    counter_responses = response_counter.get(jsonObj);
+                    response_counter.put(jsonObj,counter_responses+1);
+                }else{
+                    response_counter.put(jsonObj,1);
+                }
+            }
+            int max = 0;
+            for (Map.Entry<JsonObject,Integer> entry : response_counter.entrySet()) {
+                if(entry.getValue() > max){
+                    max = entry.getValue();
+                    finalResponse = entry.getKey();
+                }
+            }
+
+
+        }else{
+            System.err.println("ERROR: Wrong number of servers responded");
+            return;
+        }
+
+        System.out.println(finalResponse.toString());
+        /*WRITE-BACK SERVER: CLIENT WRITES EXACTLY WHAT IT READ*/
+        for (int i : servers) {
+            JsonObject response = finalResponse;
+            Runnable run = () -> {
+                changeServer(i);
+                int counter = counters.get("server" + i) + 1;
+                counters.put("server" + i, counter);
+                response.addProperty("counter",counter);
+
+                /*SENDS THE PREVIOUSLY RECEIVED SERVER JSON*/
+                String encryptedMessage = null;
+                IvParameterSpec ivSpec = null;
+                hacontract.LocationStatus ls = null;
+                String digSig = null;
+                try {
+                    ivSpec = Utils.generateIv();
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), response.toString(),ivSpec);
+                    digSig = signMessage(response.toString());
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                        .encodeToString(ivSpec.getIV())).setDigSig(digSig).setUser(user).build();
+                LocationResponse resp = null;
+
+                /*DEFINES STUB TO CONNECT TO NORMAL SERVER*/
+                changeServerNormal(i);
+
+                try {
+                    resp = bStubUS.submitLocationReport(lr);
+                } catch (Exception e) {
+                    Throwable cause = e.getCause();
+                    Status status = ((StatusException) cause).getStatus();
+                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                        init(i);
+                        try {
+                            obtainLocationReport(new int[]{i},user,epoch);
+                        } catch (InterruptedException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                    }
+                    System.err.println(e.getMessage());
+                    return;
+                }
 
             };
             executorService.execute(run);
@@ -144,16 +231,7 @@ public class HDLT_Ha {
             }
         }
 
-        /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
-        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
-            for (JsonObject jsonObj : serverResponses) {
-                //TODO VERIFICAR QUE AS STRING SAO IGUAIS E APENAS IMPRIMIR UMA VEZ
-                System.out.println(jsonObj.get("users").getAsString());
-            }
-        }else{
-            System.err.println("ERROR: Wrong number of servers responded");
-            return;
-        }
+
     }
 
 
@@ -256,62 +334,6 @@ public class HDLT_Ha {
             System.err.println("ERROR: Wrong number of servers responded");
             return;
         }
-
-        /*WRITE-BACK SERVER: CLIENT WRITES EXACTLY WHAT IT READ*/
-        for (int i : servers) {
-            Runnable run = () -> {
-                changeServer(i);
-                int counter = counters.get("server" + i) + 1;
-                counters.put("server" + i, counter);
-                JsonObject response = serverResponses.get(1);
-
-                /*SENDS THE PREVIOUSLY RECEIVED SERVER JSON*/
-
-                String encryptedMessage = null;
-                IvParameterSpec ivSpec = null;
-                hacontract.LocationStatus ls = null;
-                String digSig = null;
-                try {
-                    ivSpec = Utils.generateIv();
-                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i),response.toString(),ivSpec);
-                    digSig = signMessage(response.toString());
-                } catch (GeneralSecurityException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                UserAtLocation ua = UserAtLocation.newBuilder().setIv(Base64.getEncoder()
-                        .encodeToString(ivSpec.getIV())).setMessage(encryptedMessage).setDigSig(digSig).build();
-
-                Users resp;
-                try{
-                    resp =  bStub.obtainUsersAtLocation(ua);
-                }catch(Exception e){
-                    Throwable cause = e.getCause();
-                    Status status = ((StatusException) cause).getStatus();
-                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                        init(i);
-                        try {
-                            ObtainUsersAtLocation(new int[]{i}, epoch,xCoords,yCoords);
-                        } catch (InterruptedException | NoSuchPaddingException | UnrecoverableKeyException | NoSuchAlgorithmException | IllegalBlockSizeException | BadPaddingException | KeyStoreException | InvalidKeyException | IOException | InvalidKeySpecException interruptedException) {
-                            interruptedException.printStackTrace();
-                        }
-                    }
-                    System.err.println(e.getMessage());
-                    return;
-                }
-
-
-
-            };
-            executorService.execute(run);
-            Thread.sleep(100);
-            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
-                executorService.shutdownNow();
-            }
-        }
-
     }
 
     public static boolean verifyMessage(String node, String message, String digSig) {
@@ -386,11 +408,22 @@ public class HDLT_Ha {
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
         String svcIP = phrase.split(":")[0];
-        int sPort = Integer.parseInt(phrase.split(":")[1]) + n_server;
+        int sPort = Integer.parseInt(phrase.split(":")[1]) + 50 + n_server;
         ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
                 .usePlaintext()
                 .build();
         bStub = HAProtocolGrpc.newBlockingStub(channel);
+    }
+
+    private static void changeServerNormal(int n_server){
+        //Conexão com o servidor
+        String phrase = UsersMap.get("server");
+        String svcIP = phrase.split(":")[0];
+        int sPort = Integer.parseInt(phrase.split(":")[1]) + n_server;
+        ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
+                .usePlaintext()
+                .build();
+        bStubUS = UserServerGrpc.newBlockingStub(channel);
     }
 
 

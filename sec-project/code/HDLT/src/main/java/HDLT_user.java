@@ -271,10 +271,18 @@ public class HDLT_user extends UserProtocolImplBase{
 
                 JsonObject json2 = json;
                 json2.addProperty("counter", counter);
+
+                /*THIS DIGITAL SIGNATURE ONLY MAINTAINS THE INTEGRITY OF THE DATA ITSELF, WITHOUT THE COUNTER, BASICALLY ITS A WRITER'S DIG SIG*/
+                try {
+                    String dataDigSig =  signMessage(json2.toString());
+                    json2.addProperty("writerDigSig", dataDigSig);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
                 try {
                     ivSpec = Utils.generateIv();
                     encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
-                    digSig = signMessage(json.toString());
+                    digSig = signMessage(json2.toString());
                 } catch (GeneralSecurityException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
@@ -303,7 +311,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     return;
                 }
 
-                // Desencriptar -
+                // Desencriptar
                 encryptedMessage = resp.getMessage();
                 byte[] iv = Base64.getDecoder().decode(resp.getIv());
                 String decryptedMessage = null;
@@ -370,7 +378,7 @@ public class HDLT_user extends UserProtocolImplBase{
         return false;
     }
 
-    public static void ObtainLocation(int[] servers, int epoch) throws NoSuchAlgorithmException {
+    public static void ObtainLocation(int[] servers, int epoch) throws NoSuchAlgorithmException, InterruptedException {
 
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
@@ -379,73 +387,170 @@ public class HDLT_user extends UserProtocolImplBase{
         // Proof-of-Work
         final String[] powData = computePoW(json.toString());
 
+        ArrayList<JsonObject> serverResponses = new ArrayList<>();
+        ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
         for (int i : servers) {
-            changeServer(i);
-            String encryptedMessage = null;
-            IvParameterSpec ivSpec = null;
-            LocationStatus resp = null;
-            String digSig = null;
-            int counter = counters.get("server" + i) + 1;
-            counters.put("server" + i, counter);
+            Runnable run = () -> {
+                changeServer(i);
+                String encryptedMessage = null;
+                IvParameterSpec ivSpec = null;
+                LocationStatus resp = null;
+                String digSig = null;
+                int counter = counters.get("server" + i) + 1;
+                counters.put("server" + i, counter);
 
-            JsonObject json2 = json;
-            json2.addProperty("counter",counter);
-            json2.addProperty("nounce", powData[0]);
-            json2.addProperty("pow", powData[1]);
+                JsonObject json2 = json;
+                json2.addProperty("counter", counter);
+                json2.addProperty("nounce", powData[0]);
+                json2.addProperty("pow", powData[1]);
 
-            try {
-                ivSpec = Utils.generateIv();
-                encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
-                digSig = signMessage(json.toString());
-            } catch (GeneralSecurityException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
-                    .encodeToString(ivSpec.getIV())).setDigSig(digSig).build();
-            try{
-                resp = bStub.obtainLocationReport(gl);
-            } catch (Exception e) {
-                Throwable cause = e.getCause();
-                Status status = ((StatusException) cause).getStatus();
-                if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
-                    init(i);
-                    ObtainLocation(new int[]{i}, epoch);
-                    //return;
+                try {
+                    ivSpec = Utils.generateIv();
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
+                    digSig = signMessage(json2.toString());
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                System.err.println(e.getMessage());
-                return;
+
+                GetLocation gl = GetLocation.newBuilder().setMessage(encryptedMessage).setUser(user).setIv(Base64.getEncoder()
+                        .encodeToString(ivSpec.getIV())).setDigSig(digSig).build();
+                try {
+                    resp = bStub.obtainLocationReport(gl);
+                } catch (Exception e) {
+                    Throwable cause = e.getCause();
+                    Status status = ((StatusException) cause).getStatus();
+                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                        init(i);
+                        try {
+                            ObtainLocation(new int[]{i}, epoch);
+                        } catch (NoSuchAlgorithmException noSuchAlgorithmException) {
+                            noSuchAlgorithmException.printStackTrace();
+                        } catch (InterruptedException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                        //return;
+                    }
+                    System.err.println(e.getMessage());
+                    return;
+                }
+
+                encryptedMessage = resp.getMessage();
+                byte[] iv = Base64.getDecoder().decode(resp.getIv());
+                String decryptedMessage = null;
+                try {
+                    decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
+
+                if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
+                    System.err.println("ERROR: Message not Verified");
+                    return;
+                }
+
+                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                    System.err.println("ERROR: Wrong message received");
+                    return;
+                }
+                counters.replace("server"+i,counter);
+                if (verifyMessage(user, convertedResponse.toString(), convertedResponse.get("writerDigSig").getAsString())) {
+                    serverResponses.add(convertedResponse);
+                }
+            };
+            executorService.execute(run);
+            Thread.sleep(100);
+            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
+                executorService.shutdownNow();
             }
-
-            encryptedMessage = resp.getMessage();
-            byte[] iv = Base64.getDecoder().decode(resp.getIv());
-            String decryptedMessage = null;
-            try {
-                decryptedMessage = Utils.decryptMessageSymmetric(symmetricKeys.get(i), encryptedMessage, iv);
-            } catch (GeneralSecurityException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
-
-            if(!verifyMessage("server"+i,convertedResponse.toString(),resp.getDigSig())){
-                System.err.println("ERROR: Message not Verified");
-                return;
-            }
-
-            if(convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)){
-                System.err.println("ERROR: Wrong message received");
-                return;
-            }
-
-            int XCoord = convertedResponse.get("XCoord").getAsInt();
-            int YCoord = convertedResponse.get("YCoord").getAsInt();
-
-            System.out.println("User " + user + " are in (" + XCoord + "," + YCoord + ") at epoch " + epoch);
         }
+
+        /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
+        HashMap<JsonObject,Integer> response_counter = new HashMap<>();
+        int counter_responses = 0;
+        JsonObject finalResponse = new JsonObject();
+
+        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
+            for (JsonObject jsonObj : serverResponses) {
+                if(response_counter.containsKey(jsonObj)){
+                    counter_responses = response_counter.get(jsonObj);
+                    response_counter.put(jsonObj,counter_responses+1);
+                }else{
+                    response_counter.put(jsonObj,1);
+                }
+            }
+            int max = 0;
+            for (Map.Entry<JsonObject,Integer> entry : response_counter.entrySet()) {
+                if(entry.getValue() > max){
+                    max = entry.getValue();
+                    finalResponse = entry.getKey();
+                }
+            }
+
+
+        }else{
+            System.err.println("ERROR: Wrong number of servers responded");
+            return;
+        }
+
+        System.out.println(finalResponse.toString());
+        /*WRITE-BACK SERVER: CLIENT WRITES EXACTLY WHAT IT READ*/
+        for (int i : servers) {
+            JsonObject response = finalResponse;
+            Runnable run = () -> {
+                changeServer(i);
+                int counter = counters.get("server" + i) + 1;
+                counters.put("server" + i, counter);
+                response.addProperty("counter",counter);
+
+                /*SENDS THE PREVIOUSLY RECEIVED SERVER JSON*/
+                String encryptedMessage = null;
+                IvParameterSpec ivSpec = null;
+                hacontract.LocationStatus ls = null;
+                String digSig = null;
+                try {
+                    ivSpec = Utils.generateIv();
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), response.toString(),ivSpec);
+                    digSig = signMessage(response.toString());
+                } catch (GeneralSecurityException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
+                        .encodeToString(ivSpec.getIV())).setDigSig(digSig).setUser(user).build();
+                LocationResponse resp = null;
+
+                try {
+                    resp = bStub.submitLocationReport(lr);
+                } catch (Exception e) {
+                    Throwable cause = e.getCause();
+                    Status status = ((StatusException) cause).getStatus();
+                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                        init(i);
+                        try {
+                            ObtainLocation(new int[]{i},epoch);
+                        } catch (InterruptedException | NoSuchAlgorithmException interruptedException) {
+                            interruptedException.printStackTrace();
+                        }
+                    }
+                    System.err.println(e.getMessage());
+                    return;
+                }
+
+            };
+            executorService.execute(run);
+            Thread.sleep(100);
+            if(executorService.awaitTermination(100, TimeUnit.MILLISECONDS)){
+                executorService.shutdownNow();
+            }
+        }
+
     }
 
     /*Requests the users' proofs to the servers*/

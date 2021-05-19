@@ -112,7 +112,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     }
 
     @Override
-    public void submitLocationReport(LocationReport request, StreamObserver<LocationResponse> responseObserver) {
+    public  void submitLocationReport(LocationReport request, StreamObserver<LocationResponse> responseObserver) {
 
         //Decoding
         String message = null;
@@ -190,6 +190,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
         int xCoords = convertedRequest.get("xCoord").getAsInt();
         int yCoords = convertedRequest.get("yCoord").getAsInt();
+        String writerDigSig = convertedRequest.get("writerDigSig").getAsString();
         JsonArray ab = convertedRequest.get("proofers").getAsJsonArray();
 
         Map<String, String> proofers = new HashMap<>();
@@ -249,10 +250,9 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     }
                     JsonObject reportObject = new JsonObject();
                     reportObject.addProperty("user",user);
-                    reportObject.addProperty("writerDigSig", request.getDigSig());
+                    reportObject.addProperty("writerDigSig",writerDigSig);
                     reportObject.addProperty("coordX",xCoords);
                     reportObject.addProperty("coordY",yCoords);
-                    reportObject.addProperty("counter", c);
                     JsonArray proofers_array = new JsonArray();
 
                     for(Map.Entry<String,String> entry : proofers.entrySet()){
@@ -314,7 +314,6 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         String message = null;
         JsonObject convertedRequest = null;
         String user = null;
-        String digSig = request.getDigSig();
         try {
             byte[] iv = Base64.getDecoder().decode(request.getIv());
             user = request.getUser();
@@ -375,17 +374,17 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
 
         String requester = convertedRequest.get("userID").getAsString();
         int epoch = convertedRequest.get("Epoch").getAsInt();
-        int[] coords = {0,0};
+
 
         boolean flagRequest = true;
+        JsonObject response_json = new JsonObject();
         for( JsonElement report_epoch : reports){
             if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch))
             {
                 JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
                 for(JsonElement jsonElement : reports){
                     if(jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)){
-                        coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
-                        coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
+                        response_json = jsonElement.getAsJsonObject();
                         flagRequest = false;
                         break;
                     }
@@ -399,10 +398,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             return;
         }
 
-        JsonObject json = new JsonObject();
-        json.addProperty("XCoord",coords[0]);
-        json.addProperty("YCoord",coords[1]);
-        json.addProperty("counter",c+1);
+        response_json.addProperty("counter",c+1);
         userCounters.replace(user, c+1);
 
         //Encriptação
@@ -410,8 +406,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         IvParameterSpec iv = null;
         try {
             iv = Utils.generateIv();
-            resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
-            respDigSig = signMessage(json.toString());
+            resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),response_json.toString(),iv);
+            respDigSig = signMessage(response_json.toString());
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -612,17 +608,17 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             }
 
             String requester = convertedRequest.get("user").getAsString();
+            convertedRequest.remove("counter");
             int epoch = convertedRequest.get("epoch").getAsInt();
-            int[] coords = {0, 0};
 
             boolean flagRequest = true;
+            JsonObject response_json = new JsonObject();
             for (JsonElement report_epoch : reports) {
                 if (report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch)) {
                     JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
                     for (JsonElement jsonElement : reports) {
                         if (jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)) {
-                            coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
-                            coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
+                            response_json = jsonElement.getAsJsonObject();
                             flagRequest = false;
                             break;
                         }
@@ -637,16 +633,13 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             //Encriptação
             String resp = null, respDigSig = null;
             IvParameterSpec iv = null;
-            JsonObject coords_object = new JsonObject();
-            coords_object.addProperty("xCoords",coords[0]);
-            coords_object.addProperty("yCoords",coords[1]);
-            coords_object.addProperty("counter",c+1);
+            response_json.addProperty("counter",c+1);
             userCounters.replace(user, c+1);
 
             try {
                 iv = Utils.generateIv();
-                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),coords_object.toString(),iv);
-                respDigSig = signMessage(coords_object.toString());
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),response_json.toString(),iv);
+                respDigSig = signMessage(response_json.toString());
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -662,7 +655,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         }
 
         @Override
-        public void obtainUsersAtLocation(UserAtLocation request, StreamObserver<Users> responseObserver) {String user = "clientHA";
+        public void obtainUsersAtLocation(UserAtLocation request, StreamObserver<Users> responseObserver) {
+            String user = "clientHA";
             //Decoding
             String message = null;
             JsonObject convertedRequest = null;

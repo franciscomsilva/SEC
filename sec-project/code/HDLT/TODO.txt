@@ -18,14 +18,14 @@ New TODO:
     -requestMyProofs: DONE
     -obtainUsersAtLocation: DONE
 - implementar (1,N) Byzantine Atomic:
-    -obtainLocationReport(): fazer write-back (mandar o report todo no server para verificar digsig)
-    -submitLocationReport(): tentar chamar submit no HA_Server; se n der, colocar stub no HA_Client
+    -obtainLocationReport(): DONE(VERIFICAR)
+    -submitLocationReport(): DONE(VERIFICAR)
 - guardar os counters para permitir verificação - DONE
 - mecanismo de spam - DONE
 - ver o problema de byzantine users
 - Verificar se os users (normal e HA) estão a guardar o counter que recebem do sv depois de enviarem o pedido
-- Verificar se o init do HA está correto
-- Nem todos os returns tem writerDigSIg e verificam esta, analisar se houver tempo
+- Verificar se o servidor está down no init
+
 
 Stage 2:
 - step 1 - DONE

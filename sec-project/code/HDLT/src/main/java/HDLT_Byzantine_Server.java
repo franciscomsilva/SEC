@@ -1,0 +1,1159 @@
+import com.google.gson.*;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
+import com.opencsv.exceptions.CsvValidationException;
+import com.sun.org.apache.xpath.internal.operations.Bool;
+import hacontract.HAProtocolGrpc;
+import hacontract.UserAtLocation;
+import hacontract.Users;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
+import io.grpc.Status;
+import io.grpc.StatusException;
+import io.grpc.stub.StreamObserver;
+import userserver.*;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import Utils.*;
+import userserver.Key;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import static java.lang.Integer.parseInt;
+
+public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
+    // Variaveis Globais
+
+    private static String REPORTS_FILE = "files/location_reports.json";
+    private static String USERS_CONNECTION_FILE =  "files/users_connection.txt";
+
+    private static int BYZANTINE_USERS = 3;
+    private static HashMap<String,String> UsersMap = new HashMap<>();
+    private static JsonArray reports = new JsonArray();
+    private static HashMap<String, SecretKey> userSymmetricKeys = new HashMap<String, SecretKey>();
+    private static HashMap<SecretKey, Integer> userSymmetricKeysCounter = new HashMap<SecretKey, Integer>();
+    private static HashMap<String, Integer> userCounters = new HashMap<String, Integer>();
+
+    private static String keystore_password;
+    private static int n_server = 0;
+
+    private static int init_operation_mode = 0;
+    private static int submit_operation_mode = 0;
+    private static int obtain_operation_mode = 0;
+    private static int request_operation_mode = 0;
+
+
+    public static void readUsers() {
+        try (CSVReader reader = new CSVReader(new FileReader(USERS_CONNECTION_FILE))) {
+            String[] lineInArray;
+            while ((lineInArray = reader.readNext()) != null) {
+                UsersMap.put(lineInArray[0],lineInArray[1]);
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (CsvValidationException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void init(InitMessage request, StreamObserver<Key> responseObserver) {
+        if (init_operation_mode == 0) { //normal behaviour
+            String user = request.getUser();
+            int c = request.getCounter();
+            SecretKey secretKey = null;
+            try {
+                String verify = user + "," + c;
+                if (!verifyMessage(user, verify, request.getDigSig())) {
+                    System.err.println("ERROR: Message not Verified");
+                    responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                    return;
+                }
+
+                secretKey = AESKeyGenerator.write();
+                userSymmetricKeys.put(user, secretKey);
+                userSymmetricKeysCounter.put(secretKey, 10);
+
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            PublicKey pubKey = null;
+            try {
+                pubKey = Utils.readPub("keys/" + user);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                String encryptedKey = Utils.encryptSymmetricKey(pubKey, secretKey);
+                String msg = encryptedKey + "," + (c + 1);
+                String digSig = signMessage(msg);
+                Key symmetricKeyResponse = Key.newBuilder().setKey(encryptedKey).setCounter(c + 1).setDigSig(digSig).build();
+                responseObserver.onNext(symmetricKeyResponse);
+                responseObserver.onCompleted();
+                userCounters.put(user, c + 1);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else if(init_operation_mode == 1) { //rejects init
+            responseObserver.onError(new StatusException(Status.CANCELLED.withDescription("Rejected")));
+        }
+    }
+
+    @Override
+    public void submitLocationReport(LocationReport request, StreamObserver<LocationResponse> responseObserver) {
+        if (submit_operation_mode == 0) { //normal behaviour
+            //Decoding
+            String message = null;
+            String user = null;
+            JsonObject convertedRequest = null;
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                user = request.getUser();
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: No Key for User " + user);
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                String encryptedMessage = request.getMessage();
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk, encryptedMessage, iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+            if(!verifyMessage(user,message,request.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                return;
+            }
+            String requester = convertedRequest.get("userID").getAsString();
+            /*if(!requester.equals(user)){
+                System.err.println("ERROR: Invalid user");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid user"))));
+                return;
+            }*/
+            int c = convertedRequest.get("counter").getAsInt();
+            if(c <= userCounters.get(user)){
+                System.err.println("ERROR: Invalid counter");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
+                return;
+            }
+
+            int epoch = convertedRequest.get("currentEpoch").getAsInt();
+
+            boolean flagRequest = false;
+            /*RUNS THROUGH THE EPOCH OBJECTS WITH ALL THE REPORTS FOR THAT EPOCH*/
+            for( JsonElement report_epoch : reports){
+                if(report_epoch.getAsJsonObject().get("epoch").equals(epoch))
+                {
+                    JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                    for(JsonElement jsonElement : reports){
+                        if(jsonElement.getAsJsonObject().get("user").equals(user)){
+                            flagRequest = true;
+                            break;
+                        }
+                    }
+                    if(!flagRequest)
+                        break;
+                }
+            }
+
+            if(flagRequest){
+                System.err.println("ERROR: Invalid request");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid request"))));
+                return;
+            }
+
+            int xCoords = convertedRequest.get("xCoord").getAsInt();
+            int yCoords = convertedRequest.get("yCoord").getAsInt();
+            JsonArray ab = convertedRequest.get("proofers").getAsJsonArray();
+
+            Map<String, String> proofers = new HashMap<>();
+
+            for (JsonElement o : ab){
+                JsonObject obj = o.getAsJsonObject();
+                System.out.println(o.toString());
+                proofers.put(obj.get("userID").getAsString(),obj.get("digSIG").getAsString());
+            }
+
+            String verify = requester+","+epoch+","+xCoords+","+yCoords;
+
+            int counter = 0;
+            Boolean done = false;
+
+            if(!proofers.isEmpty() && proofers.size() >= BYZANTINE_USERS) {
+                for (Map.Entry<String, String> entry : proofers.entrySet()) {
+
+                    KeyFactory kf = null;
+                    try {
+                        kf = KeyFactory.getInstance("RSA");
+
+                        byte[] publicKeyBytes = Files.readAllBytes(Paths.get("keys/" + entry.getKey()));
+                        X509EncodedKeySpec specPublic = new X509EncodedKeySpec(publicKeyBytes);
+                        PublicKey publicKey = kf.generatePublic(specPublic);
+
+                        if (Utils.verifySignature(verify, entry.getValue(), publicKey)) {
+                            System.out.println("Proofer " + entry.getKey() + " Signature Verified!");
+                        } else {
+                            System.out.println("Proofer " + entry.getKey() + " Signature Not Verified!");
+                            counter++;
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Proofer " + entry.getKey() + " Signature Not Verified!");
+                        counter++;
+                    }
+                }
+                    if (proofers.size() - counter >= BYZANTINE_USERS) {
+                        boolean flagEpoch = false;
+                        /*CHECK IF JSON OBJECT FOR THAT EPOCH EXISTS*/
+                        JsonObject epoch_object = null;
+                        for( JsonElement report : reports){
+                            if(report.getAsJsonObject().get("epoch").getAsInt() == epoch)
+                            {
+                                epoch_object = report.getAsJsonObject();
+                            }
+                        }
+                        JsonArray reports_array = null;
+
+                        if(epoch_object == null){
+                            epoch_object = new JsonObject();
+                            epoch_object.addProperty("epoch",epoch);
+                            reports_array = new JsonArray();
+                            flagEpoch = true;
+                        } else{
+                            reports_array = epoch_object.getAsJsonArray("reports");
+                        }
+                        JsonObject reportObject = new JsonObject();
+                        reportObject.addProperty("user",user);
+                        reportObject.addProperty("writerDigSig", request.getDigSig());
+                        reportObject.addProperty("coordX",xCoords);
+                        reportObject.addProperty("coordY",yCoords);
+                        reportObject.addProperty("counter", c);
+                        JsonArray proofers_array = new JsonArray();
+
+                        for(Map.Entry<String,String> entry : proofers.entrySet()){
+                            JsonObject entryObject = new JsonObject();
+                            entryObject.addProperty("userID",entry.getKey());
+                            entryObject.addProperty("digSIG",entry.getValue());
+                            proofers_array.add(entryObject);
+                        }
+                        reportObject.add("proofers",proofers_array);
+                        reports_array.add(reportObject);
+                        epoch_object.add("reports",reports_array);
+                        if(flagEpoch)
+                            reports.add(epoch_object);
+
+                        try {
+                            saveReportsToFile();
+                            System.out.println("INFO: Location report submitted!");
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                        done = true;
+                    } else {
+                        System.err.println("ERROR: Location report invalid!");
+                        done = false;
+                    }
+            }
+            else{
+                done = false;
+                System.err.println("ERROR: Invalid request");
+            }
+
+            JsonObject json = new JsonObject();
+            json.addProperty("Done",done);
+            json.addProperty("counter",c+1);
+            userCounters.replace(user, c+1);
+
+            //Encriptação
+            String resp = null, respDigSig = null;
+            IvParameterSpec iv = null;
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
+                respDigSig = signMessage(json.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            LocationResponse lr = LocationResponse.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
+            responseObserver.onNext(lr);
+            responseObserver.onCompleted();
+        } else if(submit_operation_mode == 1) { //rejects init
+            responseObserver.onError(new StatusException(Status.CANCELLED.withDescription("Rejected")));
+        } else if(submit_operation_mode == 2) { //sleep
+            /*SLEEPS THE THREAD TO TIMEOUT THE REQUEST*/
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    @Override
+    public void obtainLocationReport(GetLocation request, StreamObserver<LocationStatus> responseObserver) {
+        String message = null;
+        JsonObject convertedRequest = null;
+        String user = null;
+        String digSig = request.getDigSig();
+        if (obtain_operation_mode == 0) {
+            //Decoding
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                user = request.getUser();
+                String encryptedMessage = request.getMessage();
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: Key for user " + user + "not found");
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+
+            if(!verifyMessage(request.getUser(),message,request.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                return;
+            }
+            int c = convertedRequest.get("counter").getAsInt();
+            if(c <= userCounters.get(user)){
+                System.err.println("ERROR: Invalid counter");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
+                return;
+            }
+
+            //Proof-of-Work
+            int nounce = convertedRequest.get("nounce").getAsInt();
+            String pow = convertedRequest.get("pow").getAsString();
+            convertedRequest.remove("nounce");
+            convertedRequest.remove("pow");
+            convertedRequest.remove("counter");
+            Boolean powVerify = false;
+            try {
+                powVerify = verifyPoW(convertedRequest.toString(), nounce, pow);
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+            if (!powVerify) {
+                System.err.println("ERROR: Invalid Proof-of-Work");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid Proof-of-Work"))));
+                return;
+            }
+
+            String requester = convertedRequest.get("userID").getAsString();
+            int epoch = convertedRequest.get("Epoch").getAsInt();
+            int[] coords = {0,0};
+
+            boolean flagRequest = true;
+            for( JsonElement report_epoch : reports){
+                if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch))
+                {
+                    JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                    for(JsonElement jsonElement : reports){
+                        if(jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)){
+                            coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
+                            coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
+                            flagRequest = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if(flagRequest) {
+                responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
+                System.err.println("ERROR: No location report for that user in that epoch!");
+                return;
+            }
+
+            JsonObject json = new JsonObject();
+            json.addProperty("XCoord",coords[0]);
+            json.addProperty("YCoord",coords[1]);
+            json.addProperty("counter",c+1);
+            userCounters.replace(user, c+1);
+
+            //Encriptação
+            String resp = null, respDigSig = null;
+            IvParameterSpec iv = null;
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
+                respDigSig = signMessage(json.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            LocationStatus ls = LocationStatus.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
+
+            System.out.println("INFO: Sent location report for " + requester +  " at epoch " + epoch);
+            responseObserver.onNext(ls);
+            responseObserver.onCompleted();
+        } else if(obtain_operation_mode == 1) { //rejects init
+            responseObserver.onError(new StatusException(Status.CANCELLED.withDescription("Rejected")));
+        } else if(obtain_operation_mode == 2) { //sleep
+            /*SLEEPS THE THREAD TO TIMEOUT THE REQUEST*/
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        } else if(obtain_operation_mode == 3) { //fake response
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                user = request.getUser();
+                String encryptedMessage = request.getMessage();
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: Key for user " + user + "not found");
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+
+            int c = convertedRequest.get("counter").getAsInt();
+            String requester = convertedRequest.get("userID").getAsString();
+            int epoch = convertedRequest.get("Epoch").getAsInt();
+            int[] coords = {0,0};
+
+            boolean flagRequest = true;
+            for( JsonElement report_epoch : reports){
+                if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch))
+                {
+                    JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                    for(JsonElement jsonElement : reports){
+                        if(jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)){
+                            coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt() + 1;
+                            coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt() + 2;
+                            flagRequest = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            if(flagRequest) {
+                responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
+                System.err.println("ERROR: No location report for that user in that epoch!");
+                return;
+            }
+
+            JsonObject json = new JsonObject();
+            json.addProperty("XCoord",coords[0]);
+            json.addProperty("YCoord",coords[1]);
+            json.addProperty("counter",c+1);
+            userCounters.replace(user, c+1);
+
+            //Encriptação
+            String resp = null, respDigSig = null;
+            IvParameterSpec iv = null;
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
+                respDigSig = signMessage(json.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            LocationStatus ls = LocationStatus.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
+
+            System.out.println("INFO: Sent location report for " + requester +  " at epoch " + epoch);
+            responseObserver.onNext(ls);
+            responseObserver.onCompleted();
+        }
+    }
+
+    @Override
+    public void requestMyProofs(GetProofs request, StreamObserver<ProofsResponse> responseObserver) {
+        //Decoding
+        String message = null;
+        String user = null;
+        JsonObject convertedRequest = null;
+        if (request_operation_mode == 0) { //normal behaviour
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                user = request.getUser();
+                String encryptedMessage = request.getMessage();
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: No Key for User " + user);
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+
+            if(!verifyMessage(user,message,request.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                return;
+            }
+            int c = convertedRequest.get("counter").getAsInt();
+            if(c <= userCounters.get(user)){
+                System.err.println("ERROR: Invalid counter");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
+                return;
+            }
+
+            //Proof-of-Work
+            int nounce = convertedRequest.get("nounce").getAsInt();
+            String pow = convertedRequest.get("pow").getAsString();
+            convertedRequest.remove("nounce");
+            convertedRequest.remove("pow");
+            convertedRequest.remove("counter");
+            Boolean powVerify = false;
+            try {
+                powVerify = verifyPoW(convertedRequest.toString(), nounce, pow);
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+            if (!powVerify) {
+                System.err.println("ERROR: Invalid Proof-of-Work");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid Proof-of-Work"))));
+                return;
+            }
+
+            String s = convertedRequest.get("epochs").getAsString();
+            int[] eps = Arrays.stream(s.split(",")).mapToInt(Integer::parseInt).toArray();
+            ArrayList<Integer> epochs = (ArrayList<Integer>) Arrays.stream(eps).boxed().collect(Collectors.toList());
+
+            JsonArray data = new JsonArray();
+            for (JsonElement je : reports) {
+                JsonObject jo = je.getAsJsonObject();
+                int epoch = jo.get("epoch").getAsInt();
+                if (epochs.contains(epoch)) {
+                    JsonArray reps = jo.get("reports").getAsJsonArray();
+                    for (JsonElement r : reps) {
+                        JsonArray proofers = r.getAsJsonObject().get("proofers").getAsJsonArray();
+                        for (JsonElement p : proofers) {
+                            String u = p.getAsJsonObject().get("userID").getAsString();
+                            if (u.equals(user)) {
+                                JsonObject json = new JsonObject();
+                                json.addProperty("epoch", epoch);
+                                json.addProperty("user", r.getAsJsonObject().get("user").getAsString());
+                                json.addProperty("xCoord", r.getAsJsonObject().get("coordX").getAsString());
+                                json.addProperty("yCoord", r.getAsJsonObject().get("coordY").getAsString());
+                                json.addProperty("prooferDigSig", p.getAsJsonObject().get("digSIG").getAsString());
+                                data.add(json);
+                            }
+                        }
+                    }
+                }
+            }
+            JsonObject jsonObject = new JsonObject();
+            jsonObject.addProperty("counter",c+1);
+            data.add(jsonObject);
+            userCounters.replace(user, c+1);
+
+            //Encriptação
+            String resp = null, respDigSig = null;
+            IvParameterSpec iv = null;
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(user),data.toString(),iv);
+                respDigSig = signMessage(data.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            ProofsResponse pr = ProofsResponse.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
+
+            System.out.println("INFO: Sent proofs of " + user +  " at requested epochs");
+            responseObserver.onNext(pr);
+            responseObserver.onCompleted();
+        } else if(request_operation_mode == 1) { //rejects init
+            responseObserver.onError(new StatusException(Status.CANCELLED.withDescription("Rejected")));
+        } else if(request_operation_mode == 2) { //sleep
+            /*SLEEPS THE THREAD TO TIMEOUT THE REQUEST*/
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        } else if(request_operation_mode == 3) { //fake response
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                user = request.getUser();
+                String encryptedMessage = request.getMessage();
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: No Key for User " + user);
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+
+            int c = convertedRequest.get("counter").getAsInt();
+
+            String s = convertedRequest.get("epochs").getAsString();
+            int[] eps = Arrays.stream(s.split(",")).mapToInt(Integer::parseInt).toArray();
+            ArrayList<Integer> epochs = (ArrayList<Integer>) Arrays.stream(eps).boxed().collect(Collectors.toList());
+
+            JsonArray data = new JsonArray();
+            for (JsonElement je : reports) {
+                JsonObject jo = je.getAsJsonObject();
+                int epoch = jo.get("epoch").getAsInt();
+                if (epochs.contains(epoch)) {
+                    JsonArray reps = jo.get("reports").getAsJsonArray();
+                    for (JsonElement r : reps) {
+                        JsonArray proofers = r.getAsJsonObject().get("proofers").getAsJsonArray();
+                        for (JsonElement p : proofers) {
+                            String u = p.getAsJsonObject().get("userID").getAsString();
+                            if (u.equals(user)) {
+                                JsonObject json = new JsonObject();
+                                json.addProperty("epoch", epoch);
+                                json.addProperty("user", r.getAsJsonObject().get("user").getAsString());
+                                json.addProperty("xCoord", r.getAsJsonObject().get("coordX").getAsInt() - 2);
+                                json.addProperty("yCoord", r.getAsJsonObject().get("coordY").getAsInt() - 1);
+                                json.addProperty("prooferDigSig", p.getAsJsonObject().get("digSIG").getAsString());
+                                data.add(json);
+                            }
+                        }
+                    }
+                }
+            }
+            JsonObject jsonObject = new JsonObject();
+            jsonObject.addProperty("counter",c+1);
+            data.add(jsonObject);
+            userCounters.replace(user, c+1);
+
+            //Encriptação
+            String resp = null, respDigSig = null;
+            IvParameterSpec iv = null;
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(user),data.toString(),iv);
+                respDigSig = signMessage(data.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            ProofsResponse pr = ProofsResponse.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
+
+            System.out.println("INFO: Sent proofs of " + user +  " at requested epochs");
+            responseObserver.onNext(pr);
+            responseObserver.onCompleted();
+        }
+    }
+
+    public static boolean verifyMessage(String user, String message, String digSig) {
+        try {
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+
+            byte[] publicKeyBytes = new byte[0];
+
+            publicKeyBytes = Files.readAllBytes(Paths.get("keys/" + user));
+            X509EncodedKeySpec specPublic = new X509EncodedKeySpec(publicKeyBytes);
+            PublicKey publicKey = kf.generatePublic(specPublic);
+
+            if (Utils.verifySignature(message, digSig, publicKey)) {
+                System.out.println("Message Signature Verified!");
+                return true;
+            } else {
+                System.out.println("Message Signature Not Verified!");
+                return false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public static class HA_Server extends HAProtocolGrpc.HAProtocolImplBase {
+
+        @Override
+        public void obtainLocationReport(hacontract.GetLocation request, StreamObserver<hacontract.LocationStatus> responseObserver) {
+            String user = "clientHA";
+            //Decoding
+            String message = null;
+            JsonObject convertedRequest = null;
+
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                String encryptedMessage = request.getMessage();
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: No Key for User " + user);
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+            if(!verifyMessage(user,message,request.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                return;
+            }
+            int c = convertedRequest.get("counter").getAsInt();
+            if(c <= userCounters.get(user)){
+                System.err.println("ERROR: Invalid counter");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
+                return;
+            }
+
+            String requester = convertedRequest.get("user").getAsString();
+            int epoch = convertedRequest.get("epoch").getAsInt();
+            int[] coords = {0, 0};
+
+            boolean flagRequest = true;
+            for (JsonElement report_epoch : reports) {
+                if (report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch)) {
+                    JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                    for (JsonElement jsonElement : reports) {
+                        if (jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)) {
+                            coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
+                            coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
+                            flagRequest = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (flagRequest) {
+                responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
+                return;
+            }
+            //Encriptação
+            String resp = null, respDigSig = null;
+            IvParameterSpec iv = null;
+            JsonObject coords_object = new JsonObject();
+            coords_object.addProperty("xCoords",coords[0]);
+            coords_object.addProperty("yCoords",coords[1]);
+            coords_object.addProperty("counter",c+1);
+            userCounters.replace(user, c+1);
+
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),coords_object.toString(),iv);
+                respDigSig = signMessage(coords_object.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
+            hacontract.LocationStatus ls = hacontract.LocationStatus.newBuilder().setMessage(resp).
+                    setDigSig(respDigSig).setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).build();
+            responseObserver.onNext(ls);
+            responseObserver.onCompleted();
+        }
+
+        @Override
+        public void obtainUsersAtLocation(UserAtLocation request, StreamObserver<Users> responseObserver) {String user = "clientHA";
+            //Decoding
+            String message = null;
+            JsonObject convertedRequest = null;
+
+            try {
+                byte[] iv = Base64.getDecoder().decode(request.getIv());
+                String encryptedMessage = request.getMessage();
+                if (!userSymmetricKeys.containsKey(user)) { //throw error: no key for user
+                    System.err.println("ERROR: No Key for User " + user);
+                    responseObserver.onError(new StatusException((Status.NOT_FOUND.withDescription("ERROR: Key for user " + user + "not found"))));
+                    return;
+                }
+                SecretKey sk = userSymmetricKeys.get(user);
+                int counter = userSymmetricKeysCounter.get(sk);
+                if (counter == 0) { //throw error: key timeout
+                    System.err.println("ERROR: Key Timeout");
+                    userSymmetricKeysCounter.remove(sk);
+                    userSymmetricKeys.remove(user);
+                    userCounters.remove(user);
+                    responseObserver.onError(new StatusException((Status.RESOURCE_EXHAUSTED.withDescription("ERROR: Key Timeout"))));
+                    return;
+                }
+                message = Utils.decryptMessageSymmetric(sk,encryptedMessage,iv);
+                userSymmetricKeysCounter.replace(sk, counter-1);
+                convertedRequest = new Gson().fromJson(message, JsonObject.class);
+            } catch (Exception e) {
+                System.err.println("ERROR: Invalid key");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid key"))));
+                return;
+            }
+            if(!verifyMessage(user,message,request.getDigSig())){
+                System.err.println("ERROR: Message not Verified");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                return;
+            }
+            int c = convertedRequest.get("counter").getAsInt();
+            if(c <= userCounters.get(user)){
+                System.err.println("ERROR: Invalid counter");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
+                return;
+            }
+
+            int epoch = convertedRequest.get("epoch").getAsInt();
+            int xCoords = convertedRequest.get("xCoords").getAsInt();
+            int yCoords = convertedRequest.get("yCoords").getAsInt();
+
+            List<String> users = new ArrayList<>();
+
+            boolean flagRequest = true;
+            for (JsonElement report_epoch : reports) {
+                if (report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch)) {
+                    JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
+                    for (JsonElement jsonElement : reports) {
+                        if (jsonElement.getAsJsonObject().get("coordX").getAsInt() == (xCoords) && jsonElement.getAsJsonObject().get("coordY").getAsInt() == (yCoords)) {
+                            users.add(jsonElement.getAsJsonObject().get("user").getAsString() + "," + jsonElement.getAsJsonObject().get("writerDigSIG").getAsString());
+                            flagRequest = false;
+                        }
+                    }
+                }
+            }
+
+            if (flagRequest) {
+                responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for those coordinates in that epoch!")));
+                return;
+            }
+
+            JsonObject response = new JsonObject();
+            StringBuilder sb = new StringBuilder();
+            for(String user2 : users){
+                sb.append(user2 + ";");
+            }
+            userCounters.replace(user, c+1);
+            response.addProperty("counter", c+1);
+            response.addProperty("users",sb.toString());
+
+            //Encriptação
+            String resp = null;
+            IvParameterSpec iv = null;
+            String digSig = null;
+            try {
+                iv = Utils.generateIv();
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("clientHA"),response.toString(),iv);
+                digSig = signMessage(response.toString());
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            Users u = Users.newBuilder().setIv(Base64.getEncoder()
+                    .encodeToString(iv.getIV())).setMessage(resp).setDigSig(digSig).build();
+            responseObserver.onNext(u);
+            responseObserver.onCompleted();
+        }
+
+        @Override
+        public void init(hacontract.InitMessage request, StreamObserver<hacontract.Key> responseObserver) {
+            String user = request.getUser();
+            int c = request.getCounter();
+            SecretKey secretKey = null;
+            try {
+                String verify = user + "," + c;
+                if(!verifyMessage(user, verify, request.getDigSig())){
+                    System.err.println("ERROR: Message not Verified");
+                    responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
+                    return;
+                }
+
+                secretKey = AESKeyGenerator.write();
+                userSymmetricKeys.put(user,secretKey);
+                userSymmetricKeysCounter.put(secretKey, 10);
+
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            PublicKey pubKey = null;
+            try {
+                pubKey = Utils.readPub("keys/"+user);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                String encryptedKey = Utils.encryptSymmetricKey(pubKey,secretKey);
+                String msg = encryptedKey + "," + (c+1);
+                String digSig = signMessage(msg);
+                hacontract.Key symmetricKeyResponse = hacontract.Key.newBuilder().setKey(encryptedKey).
+                        setDigSig(digSig).setCounter(c+1).build();
+                responseObserver.onNext(symmetricKeyResponse);
+                responseObserver.onCompleted();
+                userCounters.put(user, c+1);
+            } catch (GeneralSecurityException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private static void saveReportsToFile() throws IOException {
+        FileWriter fileWriter = new FileWriter(REPORTS_FILE);
+        try{
+            fileWriter.write(reports.toString());
+        }catch (Exception e){
+            System.err.println(e.getStackTrace());
+        }finally {
+            fileWriter.flush();
+            fileWriter.close();
+        }
+    }
+
+    private static void readReportsFromFile() throws IOException {
+        File f = new File(REPORTS_FILE);
+        if(!f.exists() || f.isDirectory()) {
+            return;
+        }
+
+        try(BufferedReader bufferedReader = new BufferedReader(new FileReader(REPORTS_FILE))){
+           String line = bufferedReader.readLine();
+           reports = new Gson().fromJson(line,JsonArray.class);
+        }catch(Exception e){
+            System.err.println(e.getMessage());
+        }
+
+    }
+
+    private static String signMessage(String msgToSign) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, UnrecoverableKeyException, KeyStoreException {
+        byte[] messageSigned = Utils.signMessage("keystores/keystore_server" + n_server + ".keystore", keystore_password, msgToSign);
+        return new String(Base64.getEncoder().encode(messageSigned));
+    }
+
+    private static Boolean verifyPoW(String msg, int nounce, String hash) throws NoSuchAlgorithmException {
+        String calcHash = Utils.computeSHA256(msg + nounce);
+        if (calcHash.equals(hash)) {
+            //if (calcHash.charAt(0) == '0' && calcHash.charAt(1) == '0')
+            if (calcHash.substring(0, 1).equals("00"))
+                return true;
+        }
+        return false;
+    }
+
+    public static void main(String[] args) throws IOException {
+        readUsers();
+        n_server = Integer.parseInt(args[0]);
+        int svcPort = Integer.parseInt(UsersMap.get("server").split(":")[1]) + n_server;
+        int svcPort_HA = svcPort + 50 + n_server;
+        Server svc = null;
+        Server svc_HA = null;
+
+        readReportsFromFile();
+
+        /*GETS THE USER PASSWORD FROM INPUT*/
+        keystore_password = Utils.getPasswordInput();
+
+        try {
+            svc = ServerBuilder
+                    .forPort(svcPort)
+                    .addService(new HDLT_Server())
+                    .build();
+            svc_HA = ServerBuilder
+                    .forPort( svcPort_HA)
+                    .addService(new HA_Server())
+                    .build();
+            svc.start();
+            svc_HA.start();
+
+            System.out.println("Server started, listening on " + svcPort);
+            System.out.println("HA Server started, listening on " + svcPort_HA);
+
+
+            System.out.println("\nAvailable commands:");
+            System.out.println("- Attack1 (a1): Reject init requests");
+            System.out.println("- Attack2 (a2): Reject submit requests");
+            System.out.println("- Attack3 (a3): Reject read requests");
+            System.out.println("- Attack4 (a4): Drop submit requests");
+            System.out.println("- Attack5 (a5): Drop read requests");
+            System.out.println("- Attack6 (a6): Send fake response to ObtainLocation request");
+            System.out.println("- Attack7 (a7): Send fake response to RequestProofs request");
+            System.out.println("- Quit (q): Quit byzantine mode");
+            Scanner scanner = new Scanner(System.in);
+
+            Boolean quit = false;
+            while(!quit){
+                String cmd = scanner.nextLine();
+                //String cmd = line.split(" ")[0];
+                init_operation_mode = 0;
+                submit_operation_mode = 0;
+                obtain_operation_mode = 0;
+                request_operation_mode = 0;
+                switch (cmd) {
+                    case "Attack1":
+                    case "a1":
+                        System.out.println("ATTACK: Rejecting init requests");
+                        init_operation_mode = 1;
+                        break;
+                    case "Attack2":
+                    case "a2":
+                        System.out.println("ATTACK: Rejecting submit requests");
+                        submit_operation_mode = 1;
+                        break;
+                    case "Attack3":
+                    case "a3":
+                        System.out.println("ATTACK: Rejecting read requests");
+                        obtain_operation_mode = 1;
+                        request_operation_mode = 1;
+                        break;
+                    case "Attack4":
+                    case "a4":
+                        System.out.println("ATTACK: Dropping submit requests");
+                        submit_operation_mode = 2;
+                        break;
+                    case "Attack 5":
+                    case "a5":
+                        System.out.println("ATTACK: Dropping read requests");
+                        obtain_operation_mode = 2;
+                        request_operation_mode = 2;
+                        break;
+                    case "Attack 6":
+                    case "a6":
+                        System.out.println("ATTACK: Sending fake response to ObtainLocation request");
+                        obtain_operation_mode = 3;
+                        break;
+                    case "Attack 7":
+                    case "a7":
+                        System.out.println("ATTACK: Sending fake response to RequestProofs request");
+                        request_operation_mode = 3;
+                        break;
+                    case "Quit":
+                    case "q":
+                        System.out.println("Quitting Byzantine Mode");
+                        quit = true;
+                        break;
+                    default:
+                        System.out.println("ERROR: Incorrect command");
+                }
+            }
+
+            svc.awaitTermination();
+            svc.shutdown();
+            svc_HA.awaitTermination();
+            svc_HA.shutdown();
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+}
