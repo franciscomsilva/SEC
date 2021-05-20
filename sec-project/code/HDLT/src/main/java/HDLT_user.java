@@ -53,7 +53,7 @@ public class HDLT_user extends UserProtocolImplBase{
 
     private static ConcurrentHashMap<String,String> proofers = new ConcurrentHashMap<>();
 
-    private static ArrayList<SecretKey> symmetricKeys = new ArrayList<>();
+    private static HashMap<Integer, SecretKey> symmetricKeys = new HashMap<>();
 
     private static String user;
     private static int x;
@@ -211,6 +211,7 @@ public class HDLT_user extends UserProtocolImplBase{
         InitMessage initMessage = InitMessage.newBuilder().setUser(user).setCounter(counter).setDigSig(digSig).build();
         Key responseKey = null;
 
+        responseKey = bStub.init(initMessage);
 
         String base64SymmetricKey = responseKey.getKey();
         int c = responseKey.getCounter();
@@ -232,10 +233,10 @@ public class HDLT_user extends UserProtocolImplBase{
             System.err.println("ERROR: Message not Verified");
             return;
         }
-        symmetricKeys.add(Utils.generateSymmetricKey(symmetricKeyBytes));
+        symmetricKeys.put(server,Utils.generateSymmetricKey(symmetricKeyBytes));
     }
 
-    public static void SubmitLocation(int[] servers) throws InterruptedException {
+    public static void SubmitLocation(ArrayList<Integer> servers) throws InterruptedException {
 
         JsonArray proofersArray = new JsonArray();
 
@@ -258,7 +259,7 @@ public class HDLT_user extends UserProtocolImplBase{
         System.out.println(json.toString());
 
         AtomicInteger cAck = new AtomicInteger(0);
-        ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
+        ExecutorService executorService = Executors.newFixedThreadPool(servers.size());
         for (int i : servers) {
             Runnable run = () -> {
                 changeServer(i);
@@ -301,7 +302,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
                         init(i);
                         try {
-                            SubmitLocation(new int[]{i});
+                            SubmitLocation(new ArrayList<>(i));
                         } catch (InterruptedException interruptedException) {
                             interruptedException.printStackTrace();
                         }
@@ -332,7 +333,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     bool = false;
                 }
 
-                if (!verifyMessage("server" + i, json.toString(), resp.getDigSig())) {
+                if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
                     System.err.println("ERROR: Message not Verified");
                     bool = false;
                 }
@@ -378,7 +379,7 @@ public class HDLT_user extends UserProtocolImplBase{
         return false;
     }
 
-    public static void ObtainLocation(int[] servers, int epoch) throws NoSuchAlgorithmException, InterruptedException {
+    public static void ObtainLocation(ArrayList<Integer> servers, int epoch) throws NoSuchAlgorithmException, InterruptedException {
 
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
@@ -388,7 +389,7 @@ public class HDLT_user extends UserProtocolImplBase{
         final String[] powData = computePoW(json.toString());
 
         ArrayList<JsonObject> serverResponses = new ArrayList<>();
-        ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
+        ExecutorService executorService = Executors.newFixedThreadPool(servers.size());
         for (int i : servers) {
             Runnable run = () -> {
                 changeServer(i);
@@ -424,7 +425,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
                         init(i);
                         try {
-                            ObtainLocation(new int[]{i}, epoch);
+                            ObtainLocation(new ArrayList<>(i), epoch);
                         } catch (NoSuchAlgorithmException noSuchAlgorithmException) {
                             noSuchAlgorithmException.printStackTrace();
                         } catch (InterruptedException interruptedException) {
@@ -534,7 +535,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
                         init(i);
                         try {
-                            ObtainLocation(new int[]{i},epoch);
+                            ObtainLocation(new ArrayList<>(i),epoch);
                         } catch (InterruptedException | NoSuchAlgorithmException interruptedException) {
                             interruptedException.printStackTrace();
                         }
@@ -554,7 +555,7 @@ public class HDLT_user extends UserProtocolImplBase{
     }
 
     /*Requests the users' proofs to the servers*/
-    public static void requestProofs(int[] servers, int[] epochs) throws InterruptedException, NoSuchAlgorithmException {
+    public static void requestProofs(ArrayList<Integer> servers, int[] epochs) throws InterruptedException, NoSuchAlgorithmException {
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
         String eps = null;
@@ -564,7 +565,7 @@ public class HDLT_user extends UserProtocolImplBase{
         json.addProperty("epochs", eps);
 
         ArrayList<JsonObject> serverResponses = new ArrayList<>();
-        ExecutorService executorService = Executors.newFixedThreadPool(servers.length);
+        ExecutorService executorService = Executors.newFixedThreadPool(servers.size());
 
         // Proof-of-Work
         final String[] powData = computePoW(json.toString());
@@ -604,7 +605,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
                         init(i);
                         try {
-                            requestProofs(new int[]{i}, epochs);
+                            requestProofs(new ArrayList<>(i), epochs);
                         } catch (InterruptedException interruptedException) {
                             interruptedException.printStackTrace();
                         } catch (NoSuchAlgorithmException noSuchAlgorithmException) {
@@ -728,18 +729,20 @@ public class HDLT_user extends UserProtocolImplBase{
         int svcPort = Integer.parseInt(UsersMap.get(user).split(":")[1]);
 
         int i = 0;
-        int[] servers = new int[NUMBER_SERVERS];
-        try{
-            for (i = 1; i <= NUMBER_SERVERS ; i++) {
+        ArrayList<Integer> servers = new ArrayList<>();
+
+        for (i = 1; i <= NUMBER_SERVERS ; i++) {
+            try {
                 changeServer(i);
                 init(i);
-                servers[i-1] = i;
+                servers.add(i);
+            }catch(Exception e){
+                System.err.println("ERROR: Server connection failed!");
+                counters.remove("server" + i);
             }
-        }catch(Exception e){
-            System.err.println("ERROR: Server connection failed!");
-            counters.remove("server" + i);
-            return;
+
         }
+
 
         //Instancia de Servidor para os Clients
         Server svc = null;

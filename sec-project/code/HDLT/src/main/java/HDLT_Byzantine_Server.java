@@ -1054,7 +1054,7 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
         readUsers();
         n_server = Integer.parseInt(args[0]);
         int svcPort = Integer.parseInt(UsersMap.get("server").split(":")[1]) + n_server;
-        int svcPort_HA = svcPort + 50 + n_server;
+        int svcPort_HA = svcPort + 50;
         Server svc = null;
         Server svc_HA = null;
 
@@ -1066,7 +1066,7 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
         try {
             svc = ServerBuilder
                     .forPort(svcPort)
-                    .addService(new HDLT_Server())
+                    .addService(new HDLT_Byzantine_Server())
                     .build();
             svc_HA = ServerBuilder
                     .forPort( svcPort_HA)
@@ -1087,6 +1087,7 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
             System.out.println("- Attack5 (a5): Drop read requests");
             System.out.println("- Attack6 (a6): Send fake response to ObtainLocation request");
             System.out.println("- Attack7 (a7): Send fake response to RequestProofs request");
+            System.out.println("- Reset (r): Resets to default operation modes");
             System.out.println("- Quit (q): Quit byzantine mode");
             Scanner scanner = new Scanner(System.in);
 
@@ -1140,6 +1141,14 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                     case "q":
                         System.out.println("Quitting Byzantine Mode");
                         quit = true;
+                        break;
+                    case "r":
+                    case "reset":
+                        System.out.println("Resetting operation modes");
+                        init_operation_mode = 0;
+                        submit_operation_mode = 0;
+                        obtain_operation_mode = 0;
+                        request_operation_mode = 0;
                         break;
                     default:
                         System.out.println("ERROR: Incorrect command");
