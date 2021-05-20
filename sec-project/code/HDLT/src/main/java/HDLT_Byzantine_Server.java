@@ -37,7 +37,7 @@ import static java.lang.Integer.parseInt;
 public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
 
-    private static String REPORTS_FILE = "files/location_reports.json";
+    private static String REPORTS_FILE = "files/location_reports";
     private static String USERS_CONNECTION_FILE =  "files/users_connection.txt";
 
     private static int BYZANTINE_USERS = 3;
@@ -110,7 +110,10 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                 Key symmetricKeyResponse = Key.newBuilder().setKey(encryptedKey).setCounter(c + 1).setDigSig(digSig).build();
                 responseObserver.onNext(symmetricKeyResponse);
                 responseObserver.onCompleted();
-                userCounters.put(user, c + 1);
+                if(userCounters.containsKey(user))
+                    userCounters.replace(user, c+1);
+                else
+                    userCounters.put(user,c+1);
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -160,7 +163,7 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                 responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
                 return;
             }
-            String requester = convertedRequest.get("userID").getAsString();
+            String requester = convertedRequest.get("user").getAsString();
             /*if(!requester.equals(user)){
                 System.err.println("ERROR: Invalid user");
                 responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid user"))));
@@ -173,16 +176,16 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                 return;
             }
 
-            int epoch = convertedRequest.get("currentEpoch").getAsInt();
+            int epoch = convertedRequest.get("epoch").getAsInt();
 
             boolean flagRequest = false;
             /*RUNS THROUGH THE EPOCH OBJECTS WITH ALL THE REPORTS FOR THAT EPOCH*/
             for( JsonElement report_epoch : reports){
-                if(report_epoch.getAsJsonObject().get("epoch").equals(epoch))
+                if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == epoch)
                 {
                     JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
                     for(JsonElement jsonElement : reports){
-                        if(jsonElement.getAsJsonObject().get("user").equals(user)){
+                        if(jsonElement.getAsJsonObject().get("user").getAsString().equals(user)){
                             flagRequest = true;
                             break;
                         }
@@ -200,14 +203,28 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
 
             int xCoords = convertedRequest.get("xCoord").getAsInt();
             int yCoords = convertedRequest.get("yCoord").getAsInt();
+            String writerDigSig = convertedRequest.get("writerDigSig").getAsString();
             JsonArray ab = convertedRequest.get("proofers").getAsJsonArray();
 
             Map<String, String> proofers = new HashMap<>();
-
+            ArrayList<String> proofersIDs = new ArrayList<>();
             for (JsonElement o : ab){
                 JsonObject obj = o.getAsJsonObject();
-                System.out.println(o.toString());
-                proofers.put(obj.get("userID").getAsString(),obj.get("digSIG").getAsString());
+                String userID = obj.get("userID").getAsString();
+                if(userID.equals(user)){
+                    System.err.println("ERROR: Invalid proofers");
+                    responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid proofers"))));
+                    return;
+                }
+                if(proofersIDs.contains(userID)){
+                    System.err.println("ERROR: Invalid proofers");
+                    responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid proofers"))));
+                    return;
+                }
+
+                proofersIDs.add(userID);
+
+                proofers.put(userID,obj.get("digSIG").getAsString());
             }
 
             String verify = requester+","+epoch+","+xCoords+","+yCoords;
@@ -259,10 +276,10 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                         }
                         JsonObject reportObject = new JsonObject();
                         reportObject.addProperty("user",user);
-                        reportObject.addProperty("writerDigSig", request.getDigSig());
-                        reportObject.addProperty("coordX",xCoords);
-                        reportObject.addProperty("coordY",yCoords);
-                        reportObject.addProperty("counter", c);
+                        reportObject.addProperty("epoch",epoch);
+                        reportObject.addProperty("writerDigSig",writerDigSig);
+                        reportObject.addProperty("xCoord",xCoords);
+                        reportObject.addProperty("yCoord",yCoords);
                         JsonArray proofers_array = new JsonArray();
 
                         for(Map.Entry<String,String> entry : proofers.entrySet()){
@@ -396,17 +413,16 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
 
             String requester = convertedRequest.get("userID").getAsString();
             int epoch = convertedRequest.get("Epoch").getAsInt();
-            int[] coords = {0,0};
 
             boolean flagRequest = true;
+            JsonObject response_json = new JsonObject();
             for( JsonElement report_epoch : reports){
                 if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch))
                 {
                     JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
                     for(JsonElement jsonElement : reports){
                         if(jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)){
-                            coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
-                            coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
+                            response_json = jsonElement.getAsJsonObject();
                             flagRequest = false;
                             break;
                         }
@@ -420,10 +436,7 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                 return;
             }
 
-            JsonObject json = new JsonObject();
-            json.addProperty("XCoord",coords[0]);
-            json.addProperty("YCoord",coords[1]);
-            json.addProperty("counter",c+1);
+            response_json.addProperty("counter",c+1);
             userCounters.replace(user, c+1);
 
             //Encriptação
@@ -431,8 +444,8 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
             IvParameterSpec iv = null;
             try {
                 iv = Utils.generateIv();
-                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
-                respDigSig = signMessage(json.toString());
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),response_json.toString(),iv);
+                respDigSig = signMessage(response_json.toString());
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -485,33 +498,38 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
             int c = convertedRequest.get("counter").getAsInt();
             String requester = convertedRequest.get("userID").getAsString();
             int epoch = convertedRequest.get("Epoch").getAsInt();
-            int[] coords = {0,0};
 
             boolean flagRequest = true;
+            JsonObject response_json = new JsonObject();
             for( JsonElement report_epoch : reports){
                 if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch))
                 {
                     JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
                     for(JsonElement jsonElement : reports){
                         if(jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)){
-                            coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt() + 1;
-                            coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt() + 2;
+                            response_json = jsonElement.getAsJsonObject();
                             flagRequest = false;
                             break;
                         }
                     }
                 }
             }
+            /*CHANGES COORDS FOR THE ATTACK*/
+            int xCoord = response_json.get("xCoord").getAsInt() + 1;
+            int yCoord = response_json.get("yCoord").getAsInt() +2;
+            response_json.remove("xCoord");
+            response_json.remove("yCoord");
+
+            response_json.addProperty("xCoord", xCoord);
+            response_json.addProperty("yCoord", yCoord);
+
             if(flagRequest) {
                 responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription("ERROR: No location report for that user in that epoch!")));
                 System.err.println("ERROR: No location report for that user in that epoch!");
                 return;
             }
 
-            JsonObject json = new JsonObject();
-            json.addProperty("XCoord",coords[0]);
-            json.addProperty("YCoord",coords[1]);
-            json.addProperty("counter",c+1);
+            response_json.addProperty("counter",c+1);
             userCounters.replace(user, c+1);
 
             //Encriptação
@@ -519,8 +537,8 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
             IvParameterSpec iv = null;
             try {
                 iv = Utils.generateIv();
-                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),json.toString(),iv);
-                respDigSig = signMessage(json.toString());
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get(requester),response_json.toString(),iv);
+                respDigSig = signMessage(response_json.toString());
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -528,6 +546,7 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
             }
             LocationStatus ls = LocationStatus.newBuilder().setMessage(resp).setIv(Base64.getEncoder()
                     .encodeToString(iv.getIV())).setDigSig(respDigSig).build();
+
 
             System.out.println("INFO: Sent location report for " + requester +  " at epoch " + epoch);
             responseObserver.onNext(ls);
@@ -618,8 +637,8 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                                 JsonObject json = new JsonObject();
                                 json.addProperty("epoch", epoch);
                                 json.addProperty("user", r.getAsJsonObject().get("user").getAsString());
-                                json.addProperty("xCoord", r.getAsJsonObject().get("coordX").getAsString());
-                                json.addProperty("yCoord", r.getAsJsonObject().get("coordY").getAsString());
+                                json.addProperty("xCoord", r.getAsJsonObject().get("xCoord").getAsString());
+                                json.addProperty("yCoord", r.getAsJsonObject().get("yCoord").getAsString());
                                 json.addProperty("prooferDigSig", p.getAsJsonObject().get("digSIG").getAsString());
                                 data.add(json);
                             }
@@ -708,8 +727,8 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                                 JsonObject json = new JsonObject();
                                 json.addProperty("epoch", epoch);
                                 json.addProperty("user", r.getAsJsonObject().get("user").getAsString());
-                                json.addProperty("xCoord", r.getAsJsonObject().get("coordX").getAsInt() - 2);
-                                json.addProperty("yCoord", r.getAsJsonObject().get("coordY").getAsInt() - 1);
+                                json.addProperty("xCoord", r.getAsJsonObject().get("xCoord").getAsInt() - 2);
+                                json.addProperty("yCoord", r.getAsJsonObject().get("yCoord").getAsInt() - 1);
                                 json.addProperty("prooferDigSig", p.getAsJsonObject().get("digSIG").getAsString());
                                 data.add(json);
                             }
@@ -754,10 +773,8 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
             PublicKey publicKey = kf.generatePublic(specPublic);
 
             if (Utils.verifySignature(message, digSig, publicKey)) {
-                System.out.println("Message Signature Verified!");
                 return true;
             } else {
-                System.out.println("Message Signature Not Verified!");
                 return false;
             }
         } catch (Exception e) {
@@ -818,13 +835,13 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
             int[] coords = {0, 0};
 
             boolean flagRequest = true;
+            JsonObject response_json = new JsonObject();
             for (JsonElement report_epoch : reports) {
                 if (report_epoch.getAsJsonObject().get("epoch").getAsInt() == (epoch)) {
                     JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
                     for (JsonElement jsonElement : reports) {
                         if (jsonElement.getAsJsonObject().get("user").getAsString().equals(requester)) {
-                            coords[0] = jsonElement.getAsJsonObject().get("coordX").getAsInt();
-                            coords[1] = jsonElement.getAsJsonObject().get("coordY").getAsInt();
+                            response_json = jsonElement.getAsJsonObject();
                             flagRequest = false;
                             break;
                         }
@@ -839,16 +856,13 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
             //Encriptação
             String resp = null, respDigSig = null;
             IvParameterSpec iv = null;
-            JsonObject coords_object = new JsonObject();
-            coords_object.addProperty("xCoords",coords[0]);
-            coords_object.addProperty("yCoords",coords[1]);
-            coords_object.addProperty("counter",c+1);
+            response_json.addProperty("counter",c+1);
             userCounters.replace(user, c+1);
 
             try {
                 iv = Utils.generateIv();
-                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),coords_object.toString(),iv);
-                respDigSig = signMessage(coords_object.toString());
+                resp = Utils.encryptMessageSymmetric(userSymmetricKeys.get("user_ha"),response_json.toString(),iv);
+                respDigSig = signMessage(response_json.toString());
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -999,7 +1013,10 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
                         setDigSig(digSig).setCounter(c+1).build();
                 responseObserver.onNext(symmetricKeyResponse);
                 responseObserver.onCompleted();
-                userCounters.put(user, c+1);
+                if(userCounters.containsKey(user))
+                    userCounters.replace(user, c+1);
+                else
+                    userCounters.put(user,c+1);
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -1044,7 +1061,7 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
         String calcHash = Utils.computeSHA256(msg + nounce);
         if (calcHash.equals(hash)) {
             //if (calcHash.charAt(0) == '0' && calcHash.charAt(1) == '0')
-            if (calcHash.substring(0, 1).equals("00"))
+            if (calcHash.substring(0, 4).equals("0000"))
                 return true;
         }
         return false;
@@ -1057,6 +1074,8 @@ public class HDLT_Byzantine_Server extends UserServerGrpc.UserServerImplBase {
         int svcPort_HA = svcPort + 50;
         Server svc = null;
         Server svc_HA = null;
+
+        REPORTS_FILE += + n_server + ".json";
 
         readReportsFromFile();
 

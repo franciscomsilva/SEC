@@ -36,8 +36,8 @@ import static java.lang.Integer.parseInt;
 
 public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     // Variaveis Globais
-
-    private static String REPORTS_FILE = "files/location_reports.json";
+    private static int n_server = 0;
+    private static String REPORTS_FILE = "files/location_reports";
     private static String USERS_CONNECTION_FILE =  "files/users_connection.txt";
 
     private static int BYZANTINE_USERS = 3;
@@ -48,7 +48,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
     private static HashMap<String, Integer> userCounters = new HashMap<String, Integer>();
 
     private static String keystore_password;
-    private static int n_server = 0;
+
 
     public static void readUsers() {
         try (CSVReader reader = new CSVReader(new FileReader(USERS_CONNECTION_FILE))) {
@@ -103,7 +103,10 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             Key symmetricKeyResponse = Key.newBuilder().setKey(encryptedKey).setCounter(c+1).setDigSig(digSig).build();
             responseObserver.onNext(symmetricKeyResponse);
             responseObserver.onCompleted();
-            userCounters.put(user, c+1);
+            if(userCounters.containsKey(user))
+                userCounters.replace(user, c+1);
+            else
+                userCounters.put(user,c+1);
         } catch (GeneralSecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -150,7 +153,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Integrity of the Message"))));
             return;
         }
-        String requester = convertedRequest.get("userID").getAsString();
+        String requester = convertedRequest.get("user").getAsString();
         /*if(!requester.equals(user)){
             System.err.println("ERROR: Invalid user");
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid user"))));
@@ -163,16 +166,16 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             return;
         }
 
-        int epoch = convertedRequest.get("currentEpoch").getAsInt();
+        int epoch = convertedRequest.get("epoch").getAsInt();
 
         boolean flagRequest = false;
         /*RUNS THROUGH THE EPOCH OBJECTS WITH ALL THE REPORTS FOR THAT EPOCH*/
         for( JsonElement report_epoch : reports){
-            if(report_epoch.getAsJsonObject().get("epoch").equals(epoch))
+            if(report_epoch.getAsJsonObject().get("epoch").getAsInt() == epoch)
             {
                 JsonArray reports = report_epoch.getAsJsonObject().get("reports").getAsJsonArray();
                 for(JsonElement jsonElement : reports){
-                    if(jsonElement.getAsJsonObject().get("user").equals(user)){
+                    if(jsonElement.getAsJsonObject().get("user").getAsString().equals(user)){
                         flagRequest = true;
                         break;
                     }
@@ -194,11 +197,24 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         JsonArray ab = convertedRequest.get("proofers").getAsJsonArray();
 
         Map<String, String> proofers = new HashMap<>();
-
+        ArrayList<String> proofersIDs = new ArrayList<>();
         for (JsonElement o : ab){
             JsonObject obj = o.getAsJsonObject();
-            System.out.println(o.toString());
-            proofers.put(obj.get("userID").getAsString(),obj.get("digSIG").getAsString());
+            String userID = obj.get("userID").getAsString();
+            if(userID.equals(user)){
+                System.err.println("ERROR: Invalid proofers");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid proofers"))));
+                return;
+            }
+            if(proofersIDs.contains(userID)){
+                System.err.println("ERROR: Invalid proofers");
+                responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid proofers"))));
+                return;
+            }
+
+            proofersIDs.add(userID);
+
+            proofers.put(userID,obj.get("digSIG").getAsString());
         }
 
         String verify = requester+","+epoch+","+xCoords+","+yCoords;
@@ -250,9 +266,10 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                     }
                     JsonObject reportObject = new JsonObject();
                     reportObject.addProperty("user",user);
+                    reportObject.addProperty("epoch",epoch);
                     reportObject.addProperty("writerDigSig",writerDigSig);
-                    reportObject.addProperty("coordX",xCoords);
-                    reportObject.addProperty("coordY",yCoords);
+                    reportObject.addProperty("xCoord",xCoords);
+                    reportObject.addProperty("yCoord",yCoords);
                     JsonArray proofers_array = new JsonArray();
 
                     for(Map.Entry<String,String> entry : proofers.entrySet()){
@@ -503,8 +520,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                             JsonObject json = new JsonObject();
                             json.addProperty("epoch", epoch);
                             json.addProperty("user", r.getAsJsonObject().get("user").getAsString());
-                            json.addProperty("xCoord", r.getAsJsonObject().get("coordX").getAsString());
-                            json.addProperty("yCoord", r.getAsJsonObject().get("coordY").getAsString());
+                            json.addProperty("xCoord", r.getAsJsonObject().get("xCoord").getAsString());
+                            json.addProperty("yCoord", r.getAsJsonObject().get("yCoord").getAsString());
                             json.addProperty("prooferDigSig", p.getAsJsonObject().get("digSIG").getAsString());
                             data.add(json);
                         }
@@ -791,7 +808,11 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
                         setDigSig(digSig).setCounter(c+1).build();
                 responseObserver.onNext(symmetricKeyResponse);
                 responseObserver.onCompleted();
-                userCounters.put(user, c+1);
+
+                if(userCounters.containsKey(user))
+                    userCounters.replace(user, c+1);
+                else
+                    userCounters.put(user,c+1);
             } catch (GeneralSecurityException e) {
                 e.printStackTrace();
             } catch (IOException e) {
@@ -836,7 +857,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         String calcHash = Utils.computeSHA256(msg + nounce);
         if (calcHash.equals(hash)) {
             //if (calcHash.charAt(0) == '0' && calcHash.charAt(1) == '0')
-            if (calcHash.substring(0, 1).equals("00"))
+            if (calcHash.substring(0, 4).equals("0000"))
                 return true;
         }
         return false;
@@ -849,6 +870,8 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         int svcPort_HA = svcPort + 50 ;
         Server svc = null;
         Server svc_HA = null;
+
+        REPORTS_FILE += + n_server + ".json";
 
         readReportsFromFile();
 

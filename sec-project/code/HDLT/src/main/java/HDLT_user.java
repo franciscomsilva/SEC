@@ -20,6 +20,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 
 import java.security.spec.X509EncodedKeySpec;
+import java.sql.SQLOutput;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -82,7 +83,12 @@ public class HDLT_user extends UserProtocolImplBase{
         //Split da phrase
         String svcIP = phrase.split(":")[0];
         int svcPort = Integer.parseInt(phrase.split(":")[1]);
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, svcPort)
+        ManagedChannel channel;
+        if(blockingStub != null){
+            channel = (ManagedChannel)blockingStub.getChannel();
+            channel.shutdownNow();
+        }
+        channel = ManagedChannelBuilder.forAddress(svcIP, svcPort)
                 .usePlaintext()
                 .build();
         blockingStub = UserProtocolGrpc.newBlockingStub(channel);
@@ -250,13 +256,25 @@ public class HDLT_user extends UserProtocolImplBase{
             }
         }
 
+
         JsonObject json = new JsonObject();
-        json.addProperty("userID", user);
-        json.addProperty("currentEpoch",currentEpoch);
+        json.addProperty("user", user);
+        json.addProperty("epoch",currentEpoch);
         json.addProperty("xCoord",x);
         json.addProperty("yCoord",y);
         json.add("proofers",proofersArray);
-        System.out.println(json.toString());
+
+        /*THIS DIGITAL SIGNATURE ONLY MAINTAINS THE INTEGRITY OF THE DATA ITSELF, WITHOUT THE COUNTER, BASICALLY ITS A WRITER'S DIG SIG*/
+        String dataDigSig = null;
+        try {
+            dataDigSig =  signMessage(json.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        json.addProperty("writerDigSig",dataDigSig);
+
+
 
         AtomicInteger cAck = new AtomicInteger(0);
         ExecutorService executorService = Executors.newFixedThreadPool(servers.size());
@@ -268,18 +286,12 @@ public class HDLT_user extends UserProtocolImplBase{
                 IvParameterSpec ivSpec = null;
                 String digSig = null;
                 int counter = counters.get("server" + i) + 1;
-                counters.put("server" + i, counter);
+                counters.replace("server" + i, counter);
 
                 JsonObject jsonWithCounter = json;
                 jsonWithCounter.addProperty("counter", counter);
 
-                /*THIS DIGITAL SIGNATURE ONLY MAINTAINS THE INTEGRITY OF THE DATA ITSELF, WITHOUT THE COUNTER, BASICALLY ITS A WRITER'S DIG SIG*/
-                try {
-                    String dataDigSig =  signMessage(json.toString());
-                    jsonWithCounter.addProperty("writerDigSig", dataDigSig);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+
                 try {
                     ivSpec = Utils.generateIv();
                     encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), jsonWithCounter.toString(), ivSpec);
@@ -297,9 +309,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 try {
                     resp = bStub.submitLocationReport(lr);
                 } catch (Exception e) {
-                    Throwable cause = e.getCause();
-                    Status status = ((StatusException) cause).getStatus();
-                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                    if (e.getMessage().contains("RESOURCE_EXHAUSTED") || e.getMessage().contains("NOT_FOUND")) {
                         init(i);
                         try {
                             SubmitLocation(new ArrayList<>(i));
@@ -308,7 +318,7 @@ public class HDLT_user extends UserProtocolImplBase{
                         }
                         //return;
                     }
-                    System.err.println(e.getMessage());
+                    System.err.println("ERROR: "+ e.getMessage());
                     return;
                 }
 
@@ -327,12 +337,12 @@ public class HDLT_user extends UserProtocolImplBase{
                 JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
 
                 Boolean bool = convertedResponse.get("Done").getAsBoolean();
-
-                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                counter = convertedResponse.get("counter").getAsInt();
+                if ( counter <= counters.get("server" + i)) {
                     System.err.println("ERROR: Wrong message received");
                     bool = false;
                 }
-
+                counters.replace("server"+i,counter);
                 if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
                     System.err.println("ERROR: Message not Verified");
                     bool = false;
@@ -367,10 +377,8 @@ public class HDLT_user extends UserProtocolImplBase{
             PublicKey publicKey = kf.generatePublic(specPublic);
 
             if (Utils.verifySignature(message, digSig, publicKey)) {
-                System.out.println("Message Signature Verified!");
                 return true;
             } else {
-                System.out.println("Message Signature Not Verified!");
                 return false;
             }
         } catch (Exception e) {
@@ -398,7 +406,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 LocationStatus resp = null;
                 String digSig = null;
                 int counter = counters.get("server" + i) + 1;
-                counters.put("server" + i, counter);
+                counters.replace("server" + i, counter);
 
                 JsonObject json2 = json;
                 json2.addProperty("counter", counter);
@@ -420,9 +428,9 @@ public class HDLT_user extends UserProtocolImplBase{
                 try {
                     resp = bStub.obtainLocationReport(gl);
                 } catch (Exception e) {
-                    Throwable cause = e.getCause();
-                    Status status = ((StatusException) cause).getStatus();
-                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                    System.err.println(e.getMessage());
+                    
+                    if (e.getMessage().contains("RESOURCE_EXHAUSTED") || e.getMessage().contains("NOT_FOUND")) {
                         init(i);
                         try {
                             ObtainLocation(new ArrayList<>(i), epoch);
@@ -431,9 +439,8 @@ public class HDLT_user extends UserProtocolImplBase{
                         } catch (InterruptedException interruptedException) {
                             interruptedException.printStackTrace();
                         }
-                        //return;
+
                     }
-                    System.err.println(e.getMessage());
                     return;
                 }
 
@@ -453,14 +460,17 @@ public class HDLT_user extends UserProtocolImplBase{
                     System.err.println("ERROR: Message not Verified");
                     return;
                 }
-
-                if (convertedResponse.get("counter").getAsInt() <= counters.get("server" + i)) {
+                counter = convertedResponse.get("counter").getAsInt();
+                if (counter <= counters.get("server" + i)) {
                     System.err.println("ERROR: Wrong message received");
                     return;
                 }
                 counters.replace("server"+i,counter);
                 convertedResponse.remove("counter");
-                if (verifyMessage(user, convertedResponse.toString(), convertedResponse.get("writerDigSig").getAsString())) {
+                String writerDigSig = convertedResponse.get("writerDigSig").getAsString();
+                convertedResponse.remove("writerDigSig");
+                if (verifyMessage(user, convertedResponse.toString(), writerDigSig)) {
+                    convertedResponse.addProperty("writerDigSig", writerDigSig);
                     serverResponses.add(convertedResponse);
                 }
             };
@@ -475,7 +485,6 @@ public class HDLT_user extends UserProtocolImplBase{
         HashMap<JsonObject,Integer> response_counter = new HashMap<>();
         int counter_responses = 0;
         JsonObject finalResponse = new JsonObject();
-
         if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
             for (JsonObject jsonObj : serverResponses) {
                 if(response_counter.containsKey(jsonObj)){
@@ -492,7 +501,6 @@ public class HDLT_user extends UserProtocolImplBase{
                     finalResponse = entry.getKey();
                 }
             }
-
 
         }else{
             System.err.println("ERROR: Wrong number of servers responded");
@@ -530,9 +538,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 try {
                    bStub.submitLocationReport(lr);
                 } catch (Exception e) {
-                    Throwable cause = e.getCause();
-                    Status status = ((StatusException) cause).getStatus();
-                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                    if (e.getMessage().contains("RESOURCE_EXHAUSTED") || e.getMessage().contains("NOT_FOUND")) {
                         init(i);
                         try {
                             ObtainLocation(new ArrayList<>(i),epoch);
@@ -540,7 +546,6 @@ public class HDLT_user extends UserProtocolImplBase{
                             interruptedException.printStackTrace();
                         }
                     }
-                    System.err.println(e.getMessage());
                     return;
                 }
 
@@ -558,13 +563,13 @@ public class HDLT_user extends UserProtocolImplBase{
     public static void requestProofs(ArrayList<Integer> servers, int[] epochs) throws InterruptedException, NoSuchAlgorithmException {
         JsonObject json = new JsonObject();
         json.addProperty("userID", user);
-        String eps = null;
+        String eps = "";
         for (int e : epochs) {
             eps = eps + e + ",";
         }
         json.addProperty("epochs", eps);
 
-        ArrayList<JsonObject> serverResponses = new ArrayList<>();
+        ArrayList<JsonArray> serverResponses = new ArrayList<>();
         ExecutorService executorService = Executors.newFixedThreadPool(servers.size());
 
         // Proof-of-Work
@@ -600,9 +605,7 @@ public class HDLT_user extends UserProtocolImplBase{
                 try {
                     resp = bStub.requestMyProofs(gp);
                 } catch (Exception e) {
-                    Throwable cause = e.getCause();
-                    Status status = ((StatusException) cause).getStatus();
-                    if (status.getCode().equals(Status.Code.RESOURCE_EXHAUSTED) || status.getCode().equals(Status.Code.NOT_FOUND)) {
+                    if (e.getMessage().contains("RESOURCE_EXHAUSTED") || e.getMessage().contains("NOT_FOUND")) {
                         init(i);
                         try {
                             requestProofs(new ArrayList<>(i), epochs);
@@ -628,8 +631,8 @@ public class HDLT_user extends UserProtocolImplBase{
                     e.printStackTrace();
                 }
 
-                JsonObject convertedResponse = new Gson().fromJson(decryptedMessage, JsonObject.class);
-                counter = convertedResponse.get("counter").getAsInt();
+                JsonArray convertedResponse = new Gson().fromJson(decryptedMessage, JsonArray.class);
+                counter = convertedResponse.get(convertedResponse.size() - 1).getAsJsonObject().get("counter").getAsInt();
                 if (!verifyMessage("server" + i, convertedResponse.toString(), resp.getDigSig())) {
                     System.err.println("ERROR: Message not Verified");
                     return;
@@ -639,9 +642,18 @@ public class HDLT_user extends UserProtocolImplBase{
                     System.err.println("ERROR: Wrong message received");
                     return;
                 }
-                convertedResponse.remove("counter");
+
+                /*REMOVES COUNTER*/
+                convertedResponse.remove(convertedResponse.size() -1);
                 counters.replace("server" + i, counter);
-                serverResponses.add(convertedResponse);
+
+                for(JsonElement jsonElement : convertedResponse){
+                    JsonObject jsonObject = jsonElement.getAsJsonObject();
+                    String msg = jsonObject.get("user").getAsString() +","+jsonObject.get("epoch").getAsString()+","+jsonObject.get("xCoord").getAsInt()+","+jsonObject.get("yCoord").getAsInt();
+                    if(verifyMessage(user,msg,jsonObject.get("prooferDigSig").getAsString())){
+                        serverResponses.add(convertedResponse);
+                    }
+                }
             };
             executorService.execute(run);
             Thread.sleep(100);
@@ -651,31 +663,30 @@ public class HDLT_user extends UserProtocolImplBase{
         }
         //verification
         if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
-            for (JsonObject jsonObj : serverResponses) {
-                for (JsonElement je : jsonObj.getAsJsonArray()) {
+            for (JsonArray jsonObj : serverResponses) {
+                for (JsonElement je : jsonObj) {
                     JsonObject jo = je.getAsJsonObject();
-
-                    /*BASTA VERIFICAR A ASSINATURA DO PROOFER PORQUE ESTA FOI ASSINADA TENDO EM CONTA TODOS OS DADOS, COMO USER,
-                    COORDENADAS E EPOCH, LOGO AO VERIFICAR ESTA O UTILIZADOR PODE SABER QUE O SERVIDOR NÃO ALTEROU OS DADOS INICIALMENTE SUBMETIDOS PELO REQUESTER
-                     */
                     String verify = jo.get("user").getAsString() + "," + jo.get("epoch").getAsString() + "," + jo.get("xCoord").getAsString() + "," + jo.get("yCoord").getAsString();
-                    if (verifyMessage(user, verify, jo.get("digSig").getAsString())) {
-                        System.out.println(verify);
-                        // TODO: alterar e apenas fazer 1 print para cada proof
-                    } else {
-                        System.err.println("ERROR: Invalid signature on proof");
-                    }
+                    System.out.println(verify);
                 }
             }
         }
+        else{
+            System.err.println("ERROR: Wrong number of servers responded");
+        }
     }
 
-    private static void changeServer(int n_server){
+    private static void changeServer(int n_server) {
         //Conexão com o servidor
         String phrase = UsersMap.get("server");
         String svcIP = phrase.split(":")[0];
         int sPort = Integer.parseInt(phrase.split(":")[1]) + n_server;
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
+        ManagedChannel channel;
+        if(bStub != null){
+            channel = (ManagedChannel) bStub.getChannel();
+            channel.shutdownNow();
+        }
+        channel = ManagedChannelBuilder.forAddress(svcIP, sPort)
                 .usePlaintext()
                 .build();
         bStub = UserServerGrpc.newBlockingStub(channel);
@@ -701,12 +712,15 @@ public class HDLT_user extends UserProtocolImplBase{
         Boolean finish = false;
         String hash = null;
         int n = 0;
+        int counter = 0;
         while (!finish) {
             n = r.nextInt();
+            counter++;
             hash = Utils.computeSHA256(msg + n);
-            if (hash.substring(0, 1).equals("00"))
+            if (hash.substring(0, 4).equals("0000"))
                 finish = true;
         }
+        System.out.println("INFO: PoW needed " +  counter  + " iterations!");
         return new String[]{String.valueOf(n), hash};
     }
 
