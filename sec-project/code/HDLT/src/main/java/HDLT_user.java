@@ -209,8 +209,8 @@ public class HDLT_user extends UserProtocolImplBase{
             e.printStackTrace();
         }
         InitMessage initMessage = InitMessage.newBuilder().setUser(user).setCounter(counter).setDigSig(digSig).build();
+        Key responseKey = null;
 
-        Key responseKey = bStub.init(initMessage);
 
         String base64SymmetricKey = responseKey.getKey();
         int c = responseKey.getCounter();
@@ -269,20 +269,20 @@ public class HDLT_user extends UserProtocolImplBase{
                 int counter = counters.get("server" + i) + 1;
                 counters.put("server" + i, counter);
 
-                JsonObject json2 = json;
-                json2.addProperty("counter", counter);
+                JsonObject jsonWithCounter = json;
+                jsonWithCounter.addProperty("counter", counter);
 
                 /*THIS DIGITAL SIGNATURE ONLY MAINTAINS THE INTEGRITY OF THE DATA ITSELF, WITHOUT THE COUNTER, BASICALLY ITS A WRITER'S DIG SIG*/
                 try {
-                    String dataDigSig =  signMessage(json2.toString());
-                    json2.addProperty("writerDigSig", dataDigSig);
+                    String dataDigSig =  signMessage(json.toString());
+                    jsonWithCounter.addProperty("writerDigSig", dataDigSig);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
                 try {
                     ivSpec = Utils.generateIv();
-                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), json2.toString(), ivSpec);
-                    digSig = signMessage(json2.toString());
+                    encryptedMessage = Utils.encryptMessageSymmetric(symmetricKeys.get(i), jsonWithCounter.toString(), ivSpec);
+                    digSig = signMessage(jsonWithCounter.toString());
                 } catch (GeneralSecurityException e) {
                     e.printStackTrace();
                 } catch (IOException e) {
@@ -458,6 +458,7 @@ public class HDLT_user extends UserProtocolImplBase{
                     return;
                 }
                 counters.replace("server"+i,counter);
+                convertedResponse.remove("counter");
                 if (verifyMessage(user, convertedResponse.toString(), convertedResponse.get("writerDigSig").getAsString())) {
                     serverResponses.add(convertedResponse);
                 }
@@ -498,6 +499,7 @@ public class HDLT_user extends UserProtocolImplBase{
         }
 
         System.out.println(finalResponse.toString());
+
         /*WRITE-BACK SERVER: CLIENT WRITES EXACTLY WHAT IT READ*/
         for (int i : servers) {
             JsonObject response = finalResponse;
@@ -510,7 +512,6 @@ public class HDLT_user extends UserProtocolImplBase{
                 /*SENDS THE PREVIOUSLY RECEIVED SERVER JSON*/
                 String encryptedMessage = null;
                 IvParameterSpec ivSpec = null;
-                hacontract.LocationStatus ls = null;
                 String digSig = null;
                 try {
                     ivSpec = Utils.generateIv();
@@ -524,10 +525,9 @@ public class HDLT_user extends UserProtocolImplBase{
 
                 LocationReport lr = LocationReport.newBuilder().setMessage(encryptedMessage).setIv(Base64.getEncoder()
                         .encodeToString(ivSpec.getIV())).setDigSig(digSig).setUser(user).build();
-                LocationResponse resp = null;
 
                 try {
-                    resp = bStub.submitLocationReport(lr);
+                   bStub.submitLocationReport(lr);
                 } catch (Exception e) {
                     Throwable cause = e.getCause();
                     Status status = ((StatusException) cause).getStatus();

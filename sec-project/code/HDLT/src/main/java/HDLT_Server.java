@@ -846,7 +846,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
         readUsers();
         n_server = Integer.parseInt(args[0]);
         int svcPort = Integer.parseInt(UsersMap.get("server").split(":")[1]) + n_server;
-        int svcPort_HA = svcPort + 50 + n_server;
+        int svcPort_HA = svcPort + 50 ;
         Server svc = null;
         Server svc_HA = null;
 

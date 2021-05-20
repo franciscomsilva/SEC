@@ -136,6 +136,7 @@ public class HDLT_Ha {
                     return;
                 }
                 counters.replace("server"+i,counter);
+                convertedResponse.remove("counter");
                 if (verifyMessage(user, convertedResponse.toString(), convertedResponse.get("writerDigSig").getAsString())) {
                     serverResponses.add(convertedResponse);
                 }

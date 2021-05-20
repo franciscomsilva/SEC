@@ -2,7 +2,6 @@ import com.google.gson.*;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvValidationException;
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import hacontract.HAProtocolGrpc;
 import hacontract.UserAtLocation;
 import hacontract.Users;
