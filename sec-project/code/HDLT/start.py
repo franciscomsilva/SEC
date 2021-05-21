@@ -113,19 +113,8 @@ def normal_operation():
             p.stdin.write(command + '\n')
             p.stdin.flush()
             time.sleep(1)
-
-
-
-            # if command == 's':
-            #     for s in server_process_array:         
-            #         for line in iter(s.stdout.readline,""):
-            #             print (line.rstrip())
-            #             s.stdout.flush()
-            # if command[0] == 'o':
-            #     for s in server_process_array:
-            #         p.expect(["ERROR: Invalid request","INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
-            #         print("ola")
-
+    
+    print("\n\n ALL OPERATIONS TERMINATED - CHECK THE OUTPUT FILES\n\n")
     
 
     close_server_users()

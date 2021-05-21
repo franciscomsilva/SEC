@@ -724,47 +724,32 @@ public class HDLT_byzantine_user extends UserProtocolImplBase {
             }
         }
 
-        HashMap<JsonObject, Integer> response_counter = new HashMap<>();
+        HashMap<JsonArray,Integer> response_counter = new HashMap<>();
         int counter_responses = 0;
-        JsonObject finalResponse = new JsonObject();
+        JsonArray finalResponse = new JsonArray();
         /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
         if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
             for (JsonArray jsonArr : serverResponses) {
-                JsonObject jsonObj = jsonArr.getAsJsonObject();
-                if (response_counter.containsKey(jsonObj)) {
-                    counter_responses = response_counter.get(jsonObj);
-                    response_counter.put(jsonObj, counter_responses + 1);
-                } else {
-                    response_counter.put(jsonObj, 1);
+                if(response_counter.containsKey(jsonArr)){
+                    counter_responses = response_counter.get(jsonArr);
+                    response_counter.put(jsonArr,counter_responses+1);
+                }else {
+                    response_counter.put(jsonArr, 1);
                 }
             }
             int max = 0;
-            for (Map.Entry<JsonObject, Integer> entry : response_counter.entrySet()) {
-                if (entry.getValue() > max) {
+            for (Map.Entry<JsonArray,Integer> entry : response_counter.entrySet()) {
+                if(entry.getValue() > max){
                     max = entry.getValue();
                     finalResponse = entry.getKey();
                 }
             }
-        } else {
+        }else{
             System.err.println("ERROR: Wrong number of servers responded");
             return;
         }
         System.out.println(finalResponse.toString());
-
-        /*
-        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
-            for (JsonArray jsonObj : serverResponses) {
-                for (JsonElement je : jsonObj) {
-                    JsonObject jo = je.getAsJsonObject();
-                    String verify = jo.get("user").getAsString() + "," + jo.get("epoch").getAsString() + "," + jo.get("xCoord").getAsString() + "," + jo.get("yCoord").getAsString();
-                    System.out.println(verify);
-                }
-            }
-        }
-        else{
-            System.err.println("ERROR: Wrong number of servers responded");
-        }
-        */
+        
     }
 
     public static boolean verifyMessage(String node, String message, String digSig) {

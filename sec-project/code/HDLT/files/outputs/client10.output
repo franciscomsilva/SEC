@@ -7,11 +7,4 @@ Available commands:
 - RequestMyProofs (p <epoch>,<epoch>): requests from the server the location of the user on the specified epoch
 - Sleep <n> : sleeps for n milliseconds
 - Epoch (e <epoch>) : Sets the user's epoch to the indicated
-Epoch 0> Setting time to Epoch 4
-Epoch 4> Requesting Location Proof to nearby users
-Epoch 4> Setting time to Epoch 4
-Epoch 4> Submitting Location
-Submit Location operation was successfully executed
-Epoch 4> java.util.NoSuchElementException: No line found
-	at java.base/java.util.Scanner.nextLine(Scanner.java:1651)
-	at HDLT_user.main(HDLT_user.java:819)
+Epoch 0> 

@@ -165,7 +165,7 @@ public class HDLT_Server extends UserServerGrpc.UserServerImplBase {
             responseObserver.onError(new StatusException((Status.ABORTED.withDescription("ERROR: Invalid counter"))));
             return;
         }
-
+        convertedRequest.remove("counter");
         int epoch = convertedRequest.get("epoch").getAsInt();
 
         boolean flagRequest = false;

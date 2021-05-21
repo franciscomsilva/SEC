@@ -14,4 +14,3 @@ Epoch 3> Submitting Location
 Submit Location operation was successfully executed
 Epoch 3> java.util.NoSuchElementException: No line found
 	at java.base/java.util.Scanner.nextLine(Scanner.java:1651)
-	at HDLT_user.main(HDLT_user.java:819)
