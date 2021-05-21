@@ -749,7 +749,7 @@ public class HDLT_byzantine_user extends UserProtocolImplBase {
             return;
         }
         System.out.println(finalResponse.toString());
-        
+
     }
 
     public static boolean verifyMessage(String node, String message, String digSig) {

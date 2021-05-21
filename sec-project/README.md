@@ -3,6 +3,7 @@
 We made bash scripts to help build the system and make it easier to run the system. Also, we made a Python script that launchs each component of the system and allows to make automated tests, namely attacks by byzantine users.
 Therefore, the following instructions must be applied in a Linux environment.
 
+The system was design to work with 4 servers and 10 clients. From those, up to 1 server and 3 clients can be byzantine.
 ## Move to the work directory
 
 ```
@@ -19,8 +20,7 @@ $ ./compile.sh
 ## Run the Python script with automated tests
 
 ```
-$ pip3 install pexpect
-$ python3 start.py
+$ python3 unit_tester.py
 ```
 
 ## Run the system manually
@@ -28,8 +28,15 @@ $ python3 start.py
 ### Launch Server
 ```
 $ chmod +x launchServer.sh
-$ ./launchServer.sh
+$ ./launchServer.sh <server_id>
 ```
+Where `server_id` is the number of the server being launched (1, 2, 3, ...)
+### Launch Byzantine Server
+```
+$ chmod +x launchByzantineServer.sh 
+$ ./launchByzantineServer.sh <server_id>
+```
+Where `server_id` is the number of the server being launched (1, 2, 3, ...)
 ### Launch Clients
 ```
 $ chmod +x launchClient.sh
@@ -48,6 +55,11 @@ $ chmod +x launchHA.sh
 $ ./launchHA.sh
 ```
 
+### Client and Server Keystore Passwords
+The password for the clients' keystore is `clientID` where `ID` is the number of the client being launched (1, 2, 3, ...).
+
+The password for the servers' keystore is `serverID` where `ID` is the number of the server being launched (1, 2, 3, ...).
+
 ## Project Report
 
-The project report is under the directory `doc`.
+The project reports are under the directory `doc`.
