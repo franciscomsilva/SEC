@@ -17,10 +17,9 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
+
 
 import java.security.spec.X509EncodedKeySpec;
-import java.sql.SQLOutput;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -485,6 +484,7 @@ public class HDLT_user extends UserProtocolImplBase{
         HashMap<JsonObject,Integer> response_counter = new HashMap<>();
         int counter_responses = 0;
         JsonObject finalResponse = new JsonObject();
+        /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
         if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
             for (JsonObject jsonObj : serverResponses) {
                 if(response_counter.containsKey(jsonObj)){
@@ -506,7 +506,6 @@ public class HDLT_user extends UserProtocolImplBase{
             System.err.println("ERROR: Wrong number of servers responded");
             return;
         }
-
         System.out.println(finalResponse.toString());
 
         /*WRITE-BACK SERVER: CLIENT WRITES EXACTLY WHAT IT READ*/
@@ -661,7 +660,35 @@ public class HDLT_user extends UserProtocolImplBase{
                 executorService.shutdownNow();
             }
         }
-        //verification
+
+        HashMap<JsonObject,Integer> response_counter = new HashMap<>();
+        int counter_responses = 0;
+        JsonObject finalResponse = new JsonObject();
+        /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
+        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
+            for (JsonArray jsonArr : serverResponses) {
+                JsonObject jsonObj = jsonArr.getAsJsonObject();
+                if(response_counter.containsKey(jsonObj)){
+                    counter_responses = response_counter.get(jsonObj);
+                    response_counter.put(jsonObj,counter_responses+1);
+                }else{
+                    response_counter.put(jsonObj,1);
+                }
+            }
+            int max = 0;
+            for (Map.Entry<JsonObject,Integer> entry : response_counter.entrySet()) {
+                if(entry.getValue() > max){
+                    max = entry.getValue();
+                    finalResponse = entry.getKey();
+                }
+            }
+        }else{
+            System.err.println("ERROR: Wrong number of servers responded");
+            return;
+        }
+        System.out.println(finalResponse.toString());
+
+        /*
         if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
             for (JsonArray jsonObj : serverResponses) {
                 for (JsonElement je : jsonObj) {
@@ -674,10 +701,11 @@ public class HDLT_user extends UserProtocolImplBase{
         else{
             System.err.println("ERROR: Wrong number of servers responded");
         }
+        */
     }
 
     private static void changeServer(int n_server) {
-        //Conexão com o servidor
+        //Connection to server
         String phrase = UsersMap.get("server");
         String svcIP = phrase.split(":")[0];
         int sPort = Integer.parseInt(phrase.split(":")[1]) + n_server;

@@ -168,14 +168,12 @@ public class HDLT_Ha {
                     finalResponse = entry.getKey();
                 }
             }
-
-
         }else{
             System.err.println("ERROR: Wrong number of servers responded");
             return;
         }
-
         System.out.println(finalResponse.toString());
+
         /*WRITE-BACK SERVER: CLIENT WRITES EXACTLY WHAT IT READ*/
         for (int i : servers) {
             JsonObject response = finalResponse;
@@ -324,17 +322,44 @@ public class HDLT_Ha {
                 executorService.shutdownNow();
             }
         }
+
+        HashMap<JsonObject,Integer> response_counter = new HashMap<>();
+        int counter_responses = 0;
+        JsonObject finalResponse = new JsonObject();
         /*VERIFIES RECEIVED MESSAGES FROM SERVERS*/
         if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
             for (JsonObject jsonObj : serverResponses) {
-                System.out.println(json.get("xCoords").getAsString());
-                System.out.println(json.get("yCoords").getAsString());
-                //TODO: VERIFY IF ALL THE MESSAGES ARE THE SAME
+                if(response_counter.containsKey(jsonObj)){
+                    counter_responses = response_counter.get(jsonObj);
+                    response_counter.put(jsonObj,counter_responses+1);
+                }else{
+                    response_counter.put(jsonObj,1);
+                }
+            }
+            int max = 0;
+            for (Map.Entry<JsonObject,Integer> entry : response_counter.entrySet()) {
+                if(entry.getValue() > max){
+                    max = entry.getValue();
+                    finalResponse = entry.getKey();
+                }
             }
         }else{
             System.err.println("ERROR: Wrong number of servers responded");
             return;
         }
+        System.out.println(finalResponse.toString());
+
+        /*
+        if ((double) serverResponses.size() > ((double) NUMBER_SERVERS + (double) BYZANTINE_SERVERS) / 2.0) {
+            for (JsonObject jsonObj : serverResponses) {
+                System.out.println(json.get("xCoords").getAsString());
+                System.out.println(json.get("yCoords").getAsString());
+            }
+        }else{
+            System.err.println("ERROR: Wrong number of servers responded");
+            return;
+        }
+        */
     }
 
     public static boolean verifyMessage(String node, String message, String digSig) {

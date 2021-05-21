@@ -2,15 +2,21 @@ import sys,subprocess,csv,pexpect,time,os,json
 
 
 NUMBER_USERS = 10
+NUMBER_SERVERS = 4
+NUMBER_BYZANTINE_SERVERS = 1
 NUMBER_BYZANTINE_USERS = 3
 MAVEN_PATH = "../../maven/bin/mvn"
-LOCATION_REPORT_FILE = "files/location_reports.json"
+LOCATION_REPORT_FILE = "files/location_reports"
 
 user_process_array = []
 byzantine_user_process_array = []
 
 
+server_process_array = []
+byzantine_server_process_array = []
+
 SERVER_START_COMMAND="java -cp ../lib/UserProtocolContract-1.0.jar:../lib/HAContract-1.0.jar:target/HDLT-1.0-SNAPSHOT-jar-with-dependencies.jar HDLT_Server "
+BYZANTINE_SERVER_START_COMMAND="java -cp ../lib/UserProtocolContract-1.0.jar:../lib/HAContract-1.0.jar:target/HDLT-1.0-SNAPSHOT-jar-with-dependencies.jar HDLT_Byzantine_Server "
 USER_START_COMMAND="java -cp ../lib/UserProtocolContract-1.0.jar:target/HDLT-1.0-SNAPSHOT-jar-with-dependencies.jar HDLT_user "
 BYZANTINE_USER_START_COMMAND="java -cp ../lib/UserProtocolContract-1.0.jar:target/HDLT-1.0-SNAPSHOT-jar-with-dependencies.jar HDLT_byzantine_user "
 
@@ -24,29 +30,38 @@ def compile():
     if return_code.returncode == 0:
         print("INFO: Project successfully compiled!")
 
-def init_server_users(byzantine=False):
-    global server
-    #server = subprocess.Popen(SERVER_START_COMMAND, shell=True,stdout=subprocess.PIPE,text=True, stdin=subprocess.PIPE, stderr=subprocess.STDOUT,close_fds=True)
-    server = pexpect.spawn(SERVER_START_COMMAND)
-    #if server.returncode == None:
-        #print("INFO: Server started successfully!")
+def init_server_users(user_byzantine=False, server_byzantine = False):
 
-    if byzantine == False:
+    if user_byzantine == False:
         users = NUMBER_USERS
     else:
         users = NUMBER_USERS - NUMBER_BYZANTINE_USERS
-    
+
+    if server_byzantine == False:
+        servers = NUMBER_SERVERS
+    else:
+        servers = NUMBER_SERVERS - NUMBER_BYZANTINE_SERVERS
+
+    for i in range(servers):
+        command = SERVER_START_COMMAND + str(i+1)
+        server = pexpect.spawn(command)
+        server.sendline("server" + str(i+1))
+        server_process_array.append(server)
+        print("INFO: Server " + str(i+1) + " successfully started!")
+    time.sleep(5)
+
+
     for i in range(users):
-        command = USER_START_COMMAND +  'u' + str(i+1)
-        p = subprocess.Popen(command,shell=True, text=True,stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
-        p.stdin.write('e 0\n')
-        p.stdin.flush()
+        command = USER_START_COMMAND +  'client' + str(i+1)
+        p = pexpect.spawn(command)
+        p.sendline("client" + str(i+1) + "\n")
         user_process_array.append(p)
-        if p.returncode == None:
-            print("INFO: User " + str(i+1) + " successfully started!")
+        print("INFO: Client " + str(i+1) + " successfully started!")
+    time.sleep(5)
+
     
     #Starts byzantine users if flag is true
-    if byzantine == True:
+    if user_byzantine == True:
         for i in range(NUMBER_BYZANTINE_USERS):
             command = BYZANTINE_USER_START_COMMAND +  'u' + str(NUMBER_USERS-NUMBER_BYZANTINE_USERS+i+1)
             p = pexpect.spawn(command)           
@@ -58,18 +73,18 @@ def close_server_users(byzantine = False):
     for i in user_process_array:\
         i.kill()
     
+    for i in server_process_array:\
+        i.kill()
+    
     if byzantine==True:
-        for i in byzantine_user_process_array:\
+        for i in byzantine_user_process_array:
             i.terminate()
     user_process_array.clear()
     byzantine_user_process_array.clear()
 
-    global server
-    server.terminate()
 
 def normal_operation():
-    if os.path.isfile(LOCATION_REPORT_FILE):
-        os.remove(LOCATION_REPORT_FILE)
+    remove_reports_files()
     compile()   
     init_server_users()
 
@@ -84,46 +99,39 @@ def normal_operation():
             user = int(row[1])
             command = str(row[2])
             p  = user_process_array[user-1]
-            p.stdin.write((str('e ' + epoch) + '\n'))
-            p.stdin.flush()
-            p.stdout.flush()
+            p.sendline((str('e ' + epoch) + '\n'))
 
             if command == 'o':
                 if len(row) < 4:
                     exit("ERROR: Wrong syntax in command file")
                 command += " " + str(row[3])
 
-            p.stdin.write(command + '\n')
-            p.stdin.flush()
-            p.stdout.flush()
+            p.sendline(command + '\n')
     
 
             if command == 's':
-                server.expect(["INFO: Location report submitted!","ERROR: Location report invalid!","ERROR: Invalid request"])
-                print(server.after)
+                for p in server_process_array:
+                    #p.expect(" ")
+                    #print(p.read())
+         
+                    p.expect(["INFO: Location report submitted!","ERROR: Location report invalid!","ERROR: Invalid request"])
+                    print(p.after)
             if command[0] == 'o':
-                server.expect(["INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
-                print(server.after)
+                for p in server_process_array:
+                    p.expect(["INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
+                    print("ola")
 
-          
-                    
+    
             
     #Shows location report file
     print("\n-> Printing the content of `location_reports` file\n")
     time.sleep(1)
-    f = open(LOCATION_REPORT_FILE, 'r')
-    data = json.load(f)
-    print(json.dumps(data,indent=2))
-    f.close()
-
-
-
+    print_reports_files()
 
     close_server_users()
 
 def normal_byzantine_operation():
-    if os.path.isfile(LOCATION_REPORT_FILE):
-        os.remove(LOCATION_REPORT_FILE)  
+    remove_reports_files()
     compile()   
     init_server_users(byzantine=True)
      #Reads operations file and executes
@@ -153,9 +161,7 @@ def normal_byzantine_operation():
                 p.stdin.write((command + '\n'))
                 p.stdin.flush()
                 p.stdout.flush()
-                if command == 's':
-                    server.expect(["INFO: Location report submitted!","ERROR: Location report invalid!","ERROR: Invalid request"])
-                    print(server.after)                
+                
 
             if command[0] == 'a':
                 p.sendline((str('e ' + epoch)))
@@ -163,23 +169,28 @@ def normal_byzantine_operation():
                 p.expect("INFO: Attack " + command[1] + " finished!")
                 print("INFO: Attack " + command[1] + " finished!")
 
-            if command[0] == 'o':
-                server.expect(["INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
-                print(server.after)
-   
-   #Shows location report file
+       
+    #Shows location report file
     print("\n-> Printing the content of `location_reports` file\n")
     time.sleep(1)
-    f = open(LOCATION_REPORT_FILE, 'r')
-    data = json.load(f)
-    print(json.dumps(data,indent=2))
-    f.close()
+    print_reports_files()
 
 
 
     close_server_users(byzantine=True)
 
+def print_reports_files():
+    for i in range(NUMBER_SERVERS):
+        if os.path.isfile(LOCATION_REPORT_FILE + str(i+1) + ".json"):
+            f = open(LOCATION_REPORT_FILE + str(i+1) + ".json", 'r')
+            data = json.load(f)
+            print(json.dumps(data,indent=2))
+            f.close()
 
+def remove_reports_files():
+    for i in range(NUMBER_SERVERS):
+        if os.path.isfile(LOCATION_REPORT_FILE + str(i+1) + ".json"):
+            os.remove(LOCATION_REPORT_FILE + str(i+1) + ".json")  
 
 
 def main():
@@ -191,7 +202,7 @@ def main():
     }
 
     while(option != '4'):
-        print("\n---  HDLT Project Stage 1 Tester ---\n")
+        print("\n---  HDLT Project Tester ---\n")
         print("This program executes a series of Java Instances to test the server and user components")
         print("---------------------------------------------------------------------------------------\n")
         print("1 - Run normal user and server operation (request proof and submit location)")
