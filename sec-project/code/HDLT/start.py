@@ -43,21 +43,24 @@ def init_server_users(user_byzantine=False, server_byzantine = False):
         servers = NUMBER_SERVERS - NUMBER_BYZANTINE_SERVERS
 
     for i in range(servers):
-        command = SERVER_START_COMMAND + str(i+1)
-        server = pexpect.spawn(command)
-        server.sendline("server" + str(i+1))
+        command = SERVER_START_COMMAND + str(i+1)  +" &> files/outputs/server" + str(i+1) + ".output";
+        server =subprocess.Popen(command, shell=True,stdout=subprocess.PIPE,text=True, stdin=subprocess.PIPE, stderr=subprocess.STDOUT,close_fds=True)
+        server.stdin.write("server" + str(i+1) + "\n")
+        server.stdin.flush()
         server_process_array.append(server)
         print("INFO: Server " + str(i+1) + " successfully started!")
-    time.sleep(5)
+        time.sleep(1)
 
 
     for i in range(users):
-        command = USER_START_COMMAND +  'client' + str(i+1)
-        p = pexpect.spawn(command)
-        p.sendline("client" + str(i+1) + "\n")
+        command = USER_START_COMMAND +  'client' + str(i+1) +" &> files/outputs/client" + str(i+1) + ".output";
+        p = subprocess.Popen(command,shell=True, text=True,stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
+        p.stdin.write("client" + str(i+1) + "\n")
+        p.stdin.flush()
         user_process_array.append(p)
         print("INFO: Client " + str(i+1) + " successfully started!")
-    time.sleep(5)
+        time.sleep(1)
+
 
     
     #Starts byzantine users if flag is true
@@ -71,10 +74,10 @@ def init_server_users(user_byzantine=False, server_byzantine = False):
 
 def close_server_users(byzantine = False):
     for i in user_process_array:\
-        i.kill()
+        i.terminate()
     
     for i in server_process_array:\
-        i.kill()
+        i.terminate()
     
     if byzantine==True:
         for i in byzantine_user_process_array:
@@ -99,34 +102,31 @@ def normal_operation():
             user = int(row[1])
             command = str(row[2])
             p  = user_process_array[user-1]
-            p.sendline((str('e ' + epoch) + '\n'))
+            p.stdin.write((str('e ' + epoch) + '\n'))
+            p.stdin.flush()
+            time.sleep(1)
 
             if command == 'o':
                 if len(row) < 4:
                     exit("ERROR: Wrong syntax in command file")
                 command += " " + str(row[3])
+            p.stdin.write(command + '\n')
+            p.stdin.flush()
+            time.sleep(1)
 
-            p.sendline(command + '\n')
+
+
+            # if command == 's':
+            #     for s in server_process_array:         
+            #         for line in iter(s.stdout.readline,""):
+            #             print (line.rstrip())
+            #             s.stdout.flush()
+            # if command[0] == 'o':
+            #     for s in server_process_array:
+            #         p.expect(["ERROR: Invalid request","INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
+            #         print("ola")
+
     
-
-            if command == 's':
-                for p in server_process_array:
-                    #p.expect(" ")
-                    #print(p.read())
-         
-                    p.expect(["INFO: Location report submitted!","ERROR: Location report invalid!","ERROR: Invalid request"])
-                    print(p.after)
-            if command[0] == 'o':
-                for p in server_process_array:
-                    p.expect(["ERROR: Invalid request","INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
-                    print("ola")
-
-    
-            
-    #Shows location report file
-    print("\n-> Printing the content of `location_reports` file\n")
-    time.sleep(1)
-    print_reports_files()
 
     close_server_users()
 
@@ -186,6 +186,8 @@ def print_reports_files():
             data = json.load(f)
             print(json.dumps(data,indent=2))
             f.close()
+
+
 
 def remove_reports_files():
     for i in range(NUMBER_SERVERS):

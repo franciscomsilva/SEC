@@ -206,6 +206,9 @@ public class HDLT_user extends UserProtocolImplBase{
 
         /*INITIALIZES COUNTER*/
         counter = r.nextInt();
+        if(counter < 0)
+            counter = counter + 2*counter;
+
         counters.put("server" + server, counter);
         message = user + "," + counter;
         try {

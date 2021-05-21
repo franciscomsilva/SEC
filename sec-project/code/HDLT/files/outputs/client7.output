@@ -1,0 +1,27 @@
+Please enter the password to unlock the Key file: User Server started, listening on 2007
+
+Available commands:
+- RequestProof (r): requests nearby users to send proof of user location
+- SubmitLocation (s): submits location report to the server
+- ObtainLocation (o <epoch>): requests from the server the location of the user on the specified epoch
+- RequestMyProofs (p <epoch>,<epoch>): requests from the server the location of the user on the specified epoch
+- Sleep <n> : sleeps for n milliseconds
+- Epoch (e <epoch>) : Sets the user's epoch to the indicated
+Epoch 0> Setting time to Epoch 0
+Epoch 0> Requesting Location Proof to nearby users
+Epoch 0> Setting time to Epoch 0
+Epoch 0> Submitting Location
+Submit Location operation was successfully executed
+Epoch 0> Setting time to Epoch 2
+Epoch 2> Requesting Location Proof to nearby users
+Epoch 2> Setting time to Epoch 2
+Epoch 2> Submitting Location
+Submit Location operation was successfully executed
+Epoch 2> Setting time to Epoch 3
+Epoch 3> Requesting Location Proof to nearby users
+Epoch 3> Setting time to Epoch 3
+Epoch 3> Submitting Location
+Submit Location operation was successfully executed
+Epoch 3> java.util.NoSuchElementException: No line found
+	at java.base/java.util.Scanner.nextLine(Scanner.java:1651)
+	at HDLT_user.main(HDLT_user.java:819)
