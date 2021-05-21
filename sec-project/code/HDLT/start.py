@@ -118,7 +118,7 @@ def normal_operation():
                     print(p.after)
             if command[0] == 'o':
                 for p in server_process_array:
-                    p.expect(["INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
+                    p.expect(["ERROR: Invalid request","INFO: Sent location report for u"+ str(user) + " at epoch " + str(row[3]), "ERROR: No location report for that user in that epoch!", "ERROR: Invalid key"])
                     print("ola")
 
     
